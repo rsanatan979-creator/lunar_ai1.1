@@ -1,22 +1,79 @@
-# Node modules and build output of the frontend React app
-lunar-ops-ai/node_modules/
-lunar-ops-ai/dist/
-lunar-ops-ai/coverage/
+# =============================================================
+# Lunar AI — Root .gitignore
+# =============================================================
 
-# Python Virtual Environments
-.venv/
+# Python virtual environments
 venv/
-**/venv/
-**/.venv/
+.venv/
+env/
+.env/
 
-# Python cache & compiler output
-**/__pycache__/
-*.pyc
+# Python bytecode caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 
-# Local log files
+# Distribution / build artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MyPy
+.mypy_cache/
+
+# =============================================================
+# Node / Frontend
+# =============================================================
+node_modules/
+lunar-ops-ai/node_modules/
+
+# Vite / build outputs (committed selectively)
+lunar-ops-ai/dist/
+
+# =============================================================
+# Generated pipeline outputs (large binary files)
+# =============================================================
+output/
+output/*.png
+output/*.jpg
+uploads/
+
+# NumPy cache files
+*.npy
+*.npz
+
+# =============================================================
+# OS & Editor
+# =============================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+.idea/
+.vscode/settings.json
+
+# =============================================================
+# Model weights — large binary files (not for VCS)
+# Add back individual weights files if needed via git-lfs
+# =============================================================
+# weights/best.pt   ← already committed; keep tracked
+# weights/last.pt   ← already committed; keep tracked
+
+# =============================================================
+# Log files
+# =============================================================
 *.log
-lunar-ops-ai/*.log
+*.log.*
 
-# Environment variables
-.env*
-!lunar-ops-ai/.env.example
+# =============================================================
+# Temporary test files
+# =============================================================
+runs/
