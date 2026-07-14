@@ -32,7 +32,67 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-// Interfaces for our state and UI data
+// ── API Response Types ─────────────────────────────────────────────────────
+const API_BASE = '/api';
+
+interface ApiLandingSite {
+  rank: number;
+  name: string;
+  row: number;
+  col: number;
+  coordinates: string;
+  safety_score: number;
+  hazard_score: number;
+  slope: number;
+  roughness: number;
+  hazard_level: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+interface ApiHazardSummary {
+  total: number;
+  craters: number;
+  rocks: number;
+  max_severity: string;
+}
+
+interface ApiMaps {
+  elevation: string;
+  slope: string;
+  roughness: string;
+  terrain: string;
+  hazard: string;
+  fused_hazard: string;
+  landing_sites: string;
+}
+
+interface ApiRoverPath {
+  waypoints: number[][];
+  total_pixels: number;
+  estimated_distance_m: number;
+  estimated_time_min: number;
+  hazard_avoided: number;
+}
+
+interface ApiResponse {
+  elevation: { min: number; max: number; mean: number; std: number; shape: number[] };
+  terrain_stats: { safe_pct: number; caution_pct: number; unsafe_pct: number };
+  maps: ApiMaps;
+  hazards: { type: string; confidence: number; bbox: number[]; severity: string }[];
+  hazard_summary: ApiHazardSummary;
+  landing_sites: ApiLandingSite[];
+  rover_path: ApiRoverPath;
+  summary: {
+    hazard_count: number;
+    crater_count: number;
+    rock_count: number;
+    recommended_site: string;
+    recommended_coords: string;
+    mission_score: number;
+    pipeline_stages_completed: number;
+  };
+}
+
+// ── UI-layer types ─────────────────────────────────────────────────────────
 interface SiteData {
   id: string;
   name: string;
@@ -92,6 +152,13 @@ export default function App() {
   const [isExecutingLanding, setIsExecutingLanding] = useState(false);
   const [landingStep, setLandingStep] = useState(0);
 
+  // ── API / Real Backend State ───────────────────────────────────────────────
+  const [apiData, setApiData] = useState<ApiResponse | null>(null);
+  const [isRunningPipeline, setIsRunningPipeline] = useState(false);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
+  const [uploadedDemFile, setUploadedDemFile] = useState<File | null>(null);
+
   // Interactive notifications state
   const [notifications, setNotifications] = useState<Notification[]>([
     { id: '1', time: '14:32:10', text: 'AI: Hazard avoided, path recalculated.', type: 'info' },
@@ -124,74 +191,34 @@ export default function App() {
     return `${h}h ${m}m ${s}s`;
   };
 
-  // Static landing sites placeholder data
-  const landingSites = useMemo<SiteData[]>(() => [
-    {
-      id: 'site-alpha',
-      name: 'SITE ALPHA',
-      safetyScore: 96,
-      slope: 2.1,
-      rockDensity: 0.5,
-      hazardProb: 'LOW',
-      confidence: 98.5,
-      coordinates: '25.4° N, 138.2° E',
-      description: 'Mare Tranquillitatis Sector Alpha. Exceptional flat regolith plains, negligible micro-crater distribution, and optimal direct line-of-sight communications back with Earth ground telemetry.',
-      x: 35,
-      y: 40
-    },
-    {
-      id: 'site-bravo',
-      name: 'SITE BRAVO',
-      safetyScore: 89,
-      slope: 4.5,
-      rockDensity: 1.2,
-      hazardProb: 'LOW',
-      confidence: 91.2,
-      coordinates: '42.3° N, 115.6° E',
-      description: 'Mare Serenitatis South Rim. Sloped terrain border with scattered basalt blocks. Comms are stable with minor terrain obstruction risk.',
-      x: 65,
-      y: 30
-    },
-    {
-      id: 'site-charlie',
-      name: 'SITE CHARLIE',
-      safetyScore: 92,
-      slope: 3.8,
-      rockDensity: 0.8,
-      hazardProb: 'LOW',
-      confidence: 94.8,
-      coordinates: '15.6° N, 142.3° E',
-      description: 'Oceanus Procellarum Margin. Deep regolith layer with moderate low-lying contours. Excellent power generation exposure profiles.',
-      x: 70,
-      y: 60
-    },
-    {
-      id: 'site-delta',
-      name: 'SITE DELTA',
-      safetyScore: 78,
-      slope: 6.2,
-      rockDensity: 2.5,
-      hazardProb: 'MEDIUM',
-      confidence: 82.1,
-      coordinates: '30.1° S, 122.5° E',
-      description: 'Tycho Crater Outer Ejecta Blanket. Complex rolling slopes, high-density impact fragments, and minor radar signal shadow risks.',
-      x: 42,
-      y: 78
-    },
-    {
-      id: 'site-echo',
-      name: 'SITE ECHO',
-      safetyScore: 85,
-      slope: 5.1,
-      rockDensity: 1.8,
-      hazardProb: 'LOW',
-      confidence: 88.9,
-      coordinates: '5.2° S, 149.8° E',
-      description: 'Mare Imbrium East Basin. Fine-grained volcanic plains. Safe slopes with moderately spaced structural obstacles.',
-      x: 55,
-      y: 82
-    }
-  ], []);
+  // ── Landing sites: real API data when available, fallback to defaults ────────
+  const DEFAULT_SITES: SiteData[] = [
+    { id: 'site-alpha',   name: 'SITE ALPHA',   safetyScore: 96, slope: 2.1, rockDensity: 0.5, hazardProb: 'LOW',    confidence: 98.5, coordinates: '25.4° N, 138.2° E', description: 'Mare Tranquillitatis Sector Alpha. Exceptional flat regolith plains, negligible micro-crater distribution, and optimal direct line-of-sight communications back with Earth ground telemetry.', x: 35, y: 40 },
+    { id: 'site-bravo',   name: 'SITE BRAVO',   safetyScore: 89, slope: 4.5, rockDensity: 1.2, hazardProb: 'LOW',    confidence: 91.2, coordinates: '42.3° N, 115.6° E', description: 'Mare Serenitatis South Rim. Sloped terrain border with scattered basalt blocks. Comms are stable with minor terrain obstruction risk.', x: 65, y: 30 },
+    { id: 'site-charlie', name: 'SITE CHARLIE', safetyScore: 92, slope: 3.8, rockDensity: 0.8, hazardProb: 'LOW',    confidence: 94.8, coordinates: '15.6° N, 142.3° E', description: 'Oceanus Procellarum Margin. Deep regolith layer with moderate low-lying contours. Excellent power generation exposure profiles.', x: 70, y: 60 },
+    { id: 'site-delta',   name: 'SITE DELTA',   safetyScore: 78, slope: 6.2, rockDensity: 2.5, hazardProb: 'MEDIUM', confidence: 82.1, coordinates: '30.1° S, 122.5° E', description: 'Tycho Crater Outer Ejecta Blanket. Complex rolling slopes, high-density impact fragments, and minor radar signal shadow risks.', x: 42, y: 78 },
+    { id: 'site-echo',    name: 'SITE ECHO',    safetyScore: 85, slope: 5.1, rockDensity: 1.8, hazardProb: 'LOW',    confidence: 88.9, coordinates: '5.2° S, 149.8° E',   description: 'Mare Imbrium East Basin. Fine-grained volcanic plains. Safe slopes with moderately spaced structural obstacles.', x: 55, y: 82 },
+  ];
+
+  // Map positions for overlay dots (keep visual layout even for API data)
+  const MAP_POSITIONS = [ { x: 35, y: 40 }, { x: 65, y: 30 }, { x: 70, y: 60 }, { x: 42, y: 78 }, { x: 55, y: 82 } ];
+
+  const landingSites = useMemo<SiteData[]>(() => {
+    if (!apiData || apiData.landing_sites.length === 0) return DEFAULT_SITES;
+    return apiData.landing_sites.map((s, i) => ({
+      id: `site-${s.name.toLowerCase().replace('site ', '')}`,
+      name: s.name,
+      safetyScore: s.safety_score,
+      slope: s.slope,
+      rockDensity: parseFloat((s.roughness * 10).toFixed(2)),
+      hazardProb: s.hazard_level as 'LOW' | 'MEDIUM' | 'HIGH',
+      confidence: parseFloat(((1 - s.hazard_score) * 100).toFixed(1)),
+      coordinates: s.coordinates,
+      description: `AI-computed site #${s.rank}. Slope: ${s.slope}°. Roughness index: ${s.roughness.toFixed(4)}. Hazard level: ${s.hazard_level}. Computed from DEM + YOLO fusion hazard map.`,
+      x: MAP_POSITIONS[i]?.x ?? 50,
+      y: MAP_POSITIONS[i]?.y ?? 50,
+    }));
+  }, [apiData]);
 
   // Currently selected site data object
   const activeSite = useMemo(() => {
@@ -242,11 +269,23 @@ export default function App() {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processMockUpload(e.dataTransfer.files[0].name);
+      handleFileSelect(e.dataTransfer.files[0]);
     }
   };
 
-  const processMockUpload = (filename: string) => {
+  // ── Real file-select handler ───────────────────────────────────────────────
+  const handleFileSelect = (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isDem = ['tif', 'tiff', 'geotiff'].includes(ext);
+    const isImg = ['jpg', 'jpeg', 'png', 'bmp'].includes(ext);
+
+    if (isDem) {
+      setUploadedDemFile(file);
+    } else if (isImg) {
+      setUploadedImageFile(file);
+    }
+
+    // Animate upload progress bar then close modal
     setUploadProgress(0);
     const interval = setInterval(() => {
       setUploadProgress(prev => {
@@ -255,57 +294,85 @@ export default function App() {
           clearInterval(interval);
           setTimeout(() => {
             setUploadProgress(null);
-            setUploadedFile(filename);
+            setUploadedFile(file.name);
             setShowUploadModal(false);
-            // Add automated operational log
             const timestamp = new Date().toUTCString().slice(17, 25);
             setNotifications(prevLogs => [
               {
                 id: Date.now().toString(),
                 time: timestamp,
-                text: `SYSTEM: Lunar DEM file '${filename}' loaded successfully. Core mapping updated.`,
+                text: `SYSTEM: File '${file.name}' loaded locally. Click RUN AI PIPELINE to process.`,
                 type: 'success'
               },
               ...prevLogs
             ]);
-          }, 800);
+          }, 500);
           return 100;
         }
         return prev + 20;
       });
-    }, 150);
+    }, 120);
   };
 
-  // Run AI Simulation check trigger
-  const runAIScanSimulation = () => {
-    const timestamp = new Date().toUTCString().slice(17, 25);
-    const newLog: Notification = {
+  // ── Real mission pipeline runner ────────────────────────────────────────────
+  const runAIScanSimulation = async () => {
+    const timestamp = () => new Date().toUTCString().slice(17, 25);
+    setIsRunningPipeline(true);
+    setPipelineError(null);
+    setNotifications(prev => [{
       id: Date.now().toString(),
-      time: timestamp,
-      text: 'AI PIPELINE: Running real-time spatial diagnostics and recalculating hazard matrices...',
-      type: 'warning'
-    };
-    setNotifications(prev => [newLog, ...prev]);
+      time: timestamp(),
+      text: 'AI PIPELINE: Uploading files and starting terrain analysis...',
+      type: 'warning',
+    }, ...prev]);
 
-    // Animate sliders slightly to simulate computing
-    let count = 0;
-    const interval = setInterval(() => {
-      setSlopeThreshold(prev => Math.min(25, Math.max(5, prev + (Math.random() > 0.5 ? 1 : -1))));
-      setConfidenceLevel(prev => Math.min(99, Math.max(85, prev + (Math.random() > 0.5 ? 1 : -1))));
-      count++;
-      if (count > 8) {
-        clearInterval(interval);
-        setNotifications(prev => [
-          {
-            id: (Date.now() + 1).toString(),
-            time: new Date().toUTCString().slice(17, 25),
-            text: 'AI PIPELINE: Multi-spectral terrain analysis complete. High safety margins verified.',
-            type: 'success'
-          },
-          ...prev
-        ]);
+    try {
+      // 1. Upload files if present
+      const uploadFile = async (file: File) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+        if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
+        return res.json();
+      };
+
+      if (uploadedDemFile) {
+        await uploadFile(uploadedDemFile);
+        setNotifications(prev => [{ id: Date.now().toString(), time: timestamp(), text: `UPLOAD: DEM file uploaded to server.`, type: 'info' }, ...prev]);
       }
-    }, 200);
+      if (uploadedImageFile) {
+        await uploadFile(uploadedImageFile);
+        setNotifications(prev => [{ id: Date.now().toString(), time: timestamp(), text: `UPLOAD: Terrain image uploaded for YOLO detection.`, type: 'info' }, ...prev]);
+      }
+
+      // 2. Run the mission engine
+      setNotifications(prev => [{ id: Date.now().toString(), time: timestamp(), text: 'AI PIPELINE: Running DEM → Slope → Roughness → Hazard → YOLO → Fusion → Path planning...', type: 'info' }, ...prev]);
+      const runRes = await fetch(`${API_BASE}/run-mission`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      if (!runRes.ok) {
+        const err = await runRes.json();
+        throw new Error(err.error || `Pipeline failed: ${runRes.statusText}`);
+      }
+      const data: ApiResponse = await runRes.json();
+      setApiData(data);
+
+      // Update active site to best result
+      if (data.landing_sites.length > 0) {
+        setActiveSiteId(`site-${data.landing_sites[0].name.toLowerCase().replace('site ', '')}`);
+      }
+
+      setNotifications(prev => [{
+        id: Date.now().toString(),
+        time: timestamp(),
+        text: `AI PIPELINE COMPLETE: ${data.summary.hazard_count} hazards detected. Best site: ${data.summary.recommended_site} (score: ${data.summary.mission_score}%). Path: ${data.rover_path.estimated_distance_m}m / ${data.rover_path.estimated_time_min} min.`,
+        type: 'success',
+      }, ...prev]);
+    } catch (err: any) {
+      const msg = err?.message ?? 'Unknown error';
+      setPipelineError(msg);
+      setNotifications(prev => [{ id: Date.now().toString(), time: timestamp(), text: `ERROR: ${msg}`, type: 'warning' }, ...prev]);
+    } finally {
+      setIsRunningPipeline(false);
+    }
   };
 
   // Click handler inside maps to demonstrate precision coordinates & measurement tool
@@ -428,12 +495,20 @@ export default function App() {
           
           <button
             onClick={runAIScanSimulation}
-            className="flex items-center space-x-1 px-3 py-1.5 bg-slate-900 border border-panel-border hover:border-cyber-green hover:text-cyber-green rounded text-xs font-mono transition-all active:scale-95"
-            title="Trigger multi-spectral pipeline recheck"
+            disabled={isRunningPipeline}
+            className={`flex items-center space-x-1 px-3 py-1.5 bg-slate-900 border rounded text-xs font-mono transition-all active:scale-95 ${
+              isRunningPipeline
+                ? 'border-cyber-yellow text-cyber-yellow cursor-not-allowed opacity-80'
+                : 'border-panel-border hover:border-cyber-green hover:text-cyber-green'
+            }`}
+            title="Trigger full terrain analysis pipeline"
             id="btn-run-ai"
           >
-            <Play className="w-3.5 h-3.5" />
-            <span>RUN AI PIPELINE</span>
+            {isRunningPipeline ? (
+              <><RefreshCw className="w-3.5 h-3.5 animate-spin" /><span>RUNNING...</span></>
+            ) : (
+              <><Play className="w-3.5 h-3.5" /><span>RUN AI PIPELINE</span></>
+            )}
           </button>
 
           <a
@@ -813,11 +888,11 @@ export default function App() {
                 onClick={handleMapClick}
                 id="landing-map"
               >
-                {/* Background Moon Image */}
+                {/* Background Moon Image — real hazard map when pipeline has run */}
                 {layers.terrain && (
                   <img
-                    src="https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&q=80&w=1200"
-                    alt="Lunar Surface Mare Tranquillitatis"
+                    src={apiData?.maps?.fused_hazard || "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&q=80&w=1200"}
+                    alt="Lunar Surface Hazard Map"
                     className="w-full h-full object-cover opacity-60 mix-blend-lighten absolute top-0 left-0"
                     referrerPolicy="no-referrer"
                   />
@@ -1257,9 +1332,9 @@ export default function App() {
 
               {/* MAP DISPLAY FRAME */}
               <div className="flex-1 relative overflow-hidden scanline-effect border-b border-panel-border bg-slate-950" id="landing-recommendation-map">
-                {/* Background Moon Image */}
+                {/* Background: real landing sites map from pipeline, else Unsplash moon */}
                 <img
-                  src="https://images.unsplash.com/photo-1447433589675-4adf569200c1?auto=format&fit=crop&q=80&w=1200"
+                  src={apiData?.maps?.landing_sites || "https://images.unsplash.com/photo-1447433589675-4adf569200c1?auto=format&fit=crop&q=80&w=1200"}
                   alt="Lunar Geographic Terrain"
                   className="w-full h-full object-cover opacity-50 mix-blend-lighten absolute top-0 left-0"
                   referrerPolicy="no-referrer"
@@ -1586,15 +1661,11 @@ export default function App() {
               </div>
 
               {/* Drag and Drop Zone */}
-              <div
+              <label
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                onClick={() => {
-                  const filenames = ['dem_mare_tranquillitatis_RAW.dem', 'dem_tycho_crater_GIS.raw', 'dem_imbrium_basin.bin'];
-                  const picked = filenames[Math.floor(Math.random() * filenames.length)];
-                  processMockUpload(picked);
-                }}
+                htmlFor="dem-file-input"
                 className={`border-2 border-dashed rounded p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                   isDragging
                     ? 'border-cyber-cyan bg-cyber-cyan/15 text-white scale-[1.01]'
@@ -1603,12 +1674,23 @@ export default function App() {
               >
                 <Upload className="w-10 h-10 text-cyber-cyan/80 mb-3 animate-bounce" />
                 <span className="text-xs font-mono font-semibold block mb-1">
-                  Drag and drop DEM file here or <span className="text-cyber-cyan underline">click to select</span>
+                  Drag and drop file here or <span className="text-cyber-cyan underline">click to select</span>
                 </span>
                 <span className="text-[10px] font-mono text-slate-500">
-                  Supported extensions: .RAW, .DEM, .BIN (Max 50MB)
+                  DEM: .tif, .tiff  ·  Terrain image: .jpg, .jpeg, .png
                 </span>
-              </div>
+                <input
+                  id="dem-file-input"
+                  type="file"
+                  accept=".tif,.tiff,.geotiff,.jpg,.jpeg,.png,.bmp"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileSelect(e.target.files[0]);
+                    }
+                  }}
+                />
+              </label>
 
               {/* Progress Indicator */}
               {uploadProgress !== null && (
