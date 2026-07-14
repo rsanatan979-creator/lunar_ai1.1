@@ -1,0 +1,22 @@
+# Node modules and build output of the frontend React app
+lunar-ops-ai/node_modules/
+lunar-ops-ai/dist/
+lunar-ops-ai/coverage/
+
+# Python Virtual Environments
+.venv/
+venv/
+**/venv/
+**/.venv/
+
+# Python cache & compiler output
+**/__pycache__/
+*.pyc
+
+# Local log files
+*.log
+lunar-ops-ai/*.log
+
+# Environment variables
+.env*
+!lunar-ops-ai/.env.example

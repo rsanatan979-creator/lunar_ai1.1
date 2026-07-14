@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lunar Ops AI - Mission Control Console</title>
+    
+    <!-- Link to the custom CSS stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- =========================================================================
+         DECORATIVE SCANLINES OVERLAY (HUD VIBE)
+         ========================================================================= -->
+    <div class="hud-scanlines"></div>
+
+    <!-- =========================================================================
+         TOP NAVIGATION HEADER
+         ========================================================================= -->
+    <header class="main-header">
+        <!-- Brand & Mission Details -->
+        <div class="brand-container">
+            <div class="logo-pulse"></div>
+            <div class="brand-text">
+                <div class="brand-title">
+                    LUNAR OPS AI 
+                    <span class="live-badge">
+                        <span class="live-dot"></span> LIVE
+                    </span>
+                </div>
+                <p class="mission-id">
+                    MISSION ID: <span id="mission-id">{{ mission_id }}</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Dynamic Clocks & Operators telemetry -->
+        <div class="telemetry-bar">
+            <div class="tel-item">
+                <span class="tel-label">UTC CLOCK:</span>
+                <span class="tel-value" id="current-time">{{ mission_time }}</span>
+            </div>
+            <div class="tel-divider"></div>
+            <div class="tel-item">
+                <span class="tel-label">OPERATOR:</span>
+                <span class="tel-value" id="operator-id">{{ operator }}</span>
+            </div>
+            <div class="tel-divider"></div>
+            <div class="tel-item">
+                <span class="tel-label">CURRENT REGION:</span>
+                <span class="tel-value" id="current-region">{{ current_region }}</span>
+            </div>
+        </div>
+
+        <!-- Header Action Controls -->
+        <div class="header-actions">
+            <!-- Modal triggers for JS functions -->
+            <button class="btn btn-secondary" onclick="triggerDemoUpload()" id="btn-upload">
+                <span class="btn-icon">▲</span> UPLOAD DEM
+            </button>
+            <button class="btn btn-secondary" onclick="triggerAISimulation()" id="btn-run-ai">
+                <span class="btn-icon">▶</span> RUN AI PIPELINE
+            </button>
+            <button class="btn btn-secondary" onclick="alert('Exporting active GIS package...')" id="btn-export">
+                <span class="btn-icon">▼</span> EXPORT
+            </button>
+        </div>
+    </header>
+
+    <!-- =========================================================================
+         HORIZONTAL NAVIGATION TABS
+         ========================================================================= -->
+    <nav class="navigation-tabs" id="tabs-bar">
+        <div class="tabs-scroll">
+            <button class="tab-btn active" onclick="switchTab('OVERVIEW')" id="tab-overview">OVERVIEW</button>
+            <button class="tab-btn" onclick="switchTab('TERRAIN-ANALYSIS')" id="tab-terrain-analysis">TERRAIN ANALYSIS</button>
+            <button class="tab-btn" onclick="switchTab('ROVER-CONTROL')" id="tab-rover-control">ROVER CONTROL</button>
+            <button class="tab-btn" onclick="switchTab('AI-MODELS')" id="tab-ai-models">AI MODELS</button>
+            <button class="tab-btn" onclick="switchTab('LANDING-RECOMMENDATION')" id="tab-landing-recommendation">LANDING RECOMMENDATION</button>
+        </div>
+        <div class="tabs-subtext">
+            <span class="sub-status"><span class="status-dot"></span> SYSTEM: ACTIVE</span>
+            <span class="divider">|</span>
+            <span>GRID RESOLUTION: 0.12M / PX</span>
+        </div>
+    </nav>
+
+    <!-- =========================================================================
+         MAIN MULTI-SCREEN LAYOUT
+         ========================================================================= -->
+    <main class="main-layout" id="viewport-container">
+
+        <!-- =========================================================================
+             SCREEN 1 VIEWPORT: OPERATIONS OVERVIEW (Default)
+             ========================================================================= -->
+        <div class="viewport-screen active-screen" id="view-overview">
+            
+            <!-- LEFT PANEL: PIPELINE & SLIDERS -->
+            <aside class="left-panel">
+                <!-- AI Pipeline Segment -->
+                <section class="panel-section">
+                    <h2 class="section-title">
+                        <span>AI PIPELINE STATUS</span>
+                        <span class="section-icon">⚡</span>
+                    </h2>
+                    
+                    <!-- DEM State -->
+                    <div class="dem-badge">
+                        <div class="badge-left">
+                            <span class="pulse-green-dot"></span>
+                            <div>
+                                <h3 class="badge-heading">DEM LOADED</h3>
+                                <span class="badge-sub">FILE: T_TRANQ_82S.RAW</span>
+                            </div>
+                        </div>
+                        <span class="badge-size">0.03 MB</span>
+                    </div>
+
+                    <!-- Step Segments list -->
+                    <div class="pipeline-list">
+                        <!-- Step 1: Analysis -->
+                        <div class="pipeline-step">
+                            <div class="step-header">
+                                <span class="step-label">01 ANALYSIS</span>
+                                <span class="step-status">ACTIVE</span>
+                            </div>
+                            <div class="step-bar">
+                                <div class="bar-fill cyan" style="width: 100%;"></div>
+                            </div>
+                            <div class="step-sub">PROGRESS: 100% | PROC_SENS_O</div>
+                        </div>
+
+                        <!-- Step 2: Slope -->
+                        <div class="pipeline-step">
+                            <div class="step-header">
+                                <span class="step-label">02 SLOPE</span>
+                                <span class="step-status">STABLE</span>
+                            </div>
+                            <div class="step-bar">
+                                <div class="bar-fill blue" style="width: 90%;"></div>
+                            </div>
+                            <div class="step-sub">SLOPE CLEARANCE HIGH</div>
+                        </div>
+
+                        <!-- Step 3: Hazards -->
+                        <div class="pipeline-step">
+                            <div class="step-header">
+                                <span class="step-label">03 HAZARDS</span>
+                                <span class="step-status warning">WARNING</span>
+                            </div>
+                            <div class="step-bar">
+                                <div class="bar-fill red" style="width: 80%;"></div>
+                            </div>
+                            <div class="step-sub"><span id="hazard-count">{{ hazards }}</span> ACTIVE CRATERS/ROCKS</div>
+                        </div>
+
+                        <!-- Step 4: Landing -->
+                        <div class="pipeline-step">
+                            <div class="step-header">
+                                <span class="step-label">04 LANDING</span>
+                                <span class="step-status safe">RECOMMENDED</span>
+                            </div>
+                            <div class="step-bar">
+                                <div class="bar-fill green" style="width: 96%;"></div>
+                            </div>
+                            <div class="step-sub">LANDING SCORE: <span id="landing-score">{{ landing_score }}</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Slope Threshold Controls -->
+                <section class="panel-section">
+                    <div class="slider-header">
+                        <label class="slider-label" for="slope-range">SLOPE THRESHOLD</label>
+                        <span class="slider-val" id="slope-display">{{ slope_cutoff }}</span>
+                    </div>
+                    <input type="range" id="slope-range" min="5" max="35" value="15" class="hud-slider" oninput="updateSlopeSlider(this.value)">
+                    <div class="slider-bounds">
+                        <span>MIN: 5°</span>
+                        <span>CRITICAL SHUTOFF</span>
+                        <span>MAX: 35°</span>
+                    </div>
+                </section>
+
+                <!-- Confidence Controls -->
+                <section class="panel-section">
+                    <div class="slider-header">
+                        <label class="slider-label" for="confidence-range">DETECTION CONFIDENCE</label>
+                        <span class="slider-val" id="confidence-display">{{ detection_confidence }}</span>
+                    </div>
+                    <input type="range" id="confidence-range" min="50" max="100" value="95" class="hud-slider" oninput="updateConfidenceSlider(this.value)">
+                    <div class="slider-bounds">
+                        <span>50% SENSITIVE</span>
+                        <span>95% DEFAULT</span>
+                        <span>100% STRICT</span>
+                    </div>
+                </section>
+
+                <!-- Telemetry LED Status Grids -->
+                <section class="panel-section">
+                    <h3 class="subsection-title">HUD TELEMETRY FEED</h3>
+                    <div class="telemetry-grid">
+                        <div class="telemetry-box" id="tel-gps">
+                            <span class="tel-box-lbl">GPS LOCK</span>
+                            <div class="led-dot green"></div>
+                            <span class="tel-box-sub">SATS: 8/8</span>
+                        </div>
+                        <div class="telemetry-box" id="tel-imu">
+                            <span class="tel-box-lbl">IMU STATE</span>
+                            <div class="led-dot green"></div>
+                            <span class="tel-box-sub">STABLE</span>
+                        </div>
+                        <div class="telemetry-box" id="tel-power">
+                            <span class="tel-box-lbl">POWER GRID</span>
+                            <div class="led-dot green"></div>
+                            <span class="tel-box-sub" id="battery">{{ battery }}</span>
+                        </div>
+                        <div class="telemetry-box" id="tel-link">
+                            <span class="tel-box-lbl">S-BAND LINK</span>
+                            <div class="led-dot green"></div>
+                            <span class="tel-box-sub" id="signal">{{ signal }}</span>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- CENTER PANEL: INTERACTIVE HUD MAP -->
+            <section class="center-panel">
+                <!-- Floating Map Tools -->
+                <div class="floating-map-actions">
+                    <button class="map-action-btn" onclick="toggleMeasureMode()" id="btn-map-measure">
+                        📏 MEASURE
+                    </button>
+                    <button class="map-action-btn" onclick="alert('Zooming Map In...')">➕</button>
+                    <button class="map-action-btn" onclick="alert('Zooming Map Out...')">➖</button>
+                    <button class="map-action-btn" onclick="toggleMapGrid()">🌐 GRID ON/OFF</button>
+                </div>
+
+                <!-- Floating Compass HUD -->
+                <div class="map-compass-hud">
+                    <div class="compass-ring">▲</div>
+                    <span class="compass-lbl">N</span>
+                </div>
+
+                <!-- Measure overlay feedback -->
+                <div class="measure-hud-overlay" id="measure-panel" style="display: none;">
+                    <div class="overlay-header">RANGE FINDER DISPATCH</div>
+                    <p>Click two coordinates on the terrain canvas to measure raw geographic distance.</p>
+                    <div class="measure-data" id="measure-result">No points selected</div>
+                </div>
+
+                <!-- Real Moon Map Canvas Frame -->
+                <div class="map-canvas-frame" id="map-container" onclick="handleMapViewportClick(event)">
+                    <!-- Background crater geography -->
+                    <img src="https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&q=80&w=1200" alt="Mare Crater Surface" class="map-terrain-underlay" id="landing-map">
+
+                    <!-- Grid overlay lines -->
+                    <div class="map-coordinate-grid" id="map-coordinates-grid-lines">
+                        <svg width="100%" height="100%">
+                            <defs>
+                                <pattern id="index-grid" width="60" height="60" patternUnits="userSpaceOnUse">
+                                    <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(0, 240, 255, 0.2)" stroke-width="0.5"/>
+                                </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill="url(#index-grid)" />
+                            <!-- Concentric rings -->
+                            <circle cx="50%" cy="50%" r="80" fill="none" stroke="rgba(0, 240, 255, 0.25)" stroke-width="0.5" stroke-dasharray="5,5" />
+                        </svg>
+                        <!-- Grid labels -->
+                        <div class="grid-coordinate-label top-left">+139.07°N</div>
+                        <div class="grid-coordinate-label mid-left">+132.07°N</div>
+                        <div class="grid-coordinate-label bottom-left">+120.50°N</div>
+                        
+                        <!-- Named Lunar Craters (tactical GIS label style) -->
+                        <div class="crater-label" style="top: 15%; left: 15%;">Copernicus Crater</div>
+                        <div class="crater-label" style="top: 28%; left: 70%;">Mare Tranquillitatis</div>
+                        <div class="crater-label" style="top: 60%; left: 15%;">Theophilus Crater</div>
+                        <div class="crater-label" style="top: 78%; left: 75%;">Tycho Crater</div>
+                    </div>
+
+                    <!-- Static YOLO AI boxes -->
+                    <div class="ai-detection-layer">
+                        <div class="ai-box" style="top: 25%; left: 60%; width: 100px; height: 60px;">
+                            <span class="ai-box-label">ROCK CLUSTER (CONF. 92%)</span>
+                        </div>
+                        <div class="ai-box border-red" style="top: 35%; left: 38%; width: 140px; height: 140px;">
+                            <span class="ai-box-label bg-red">CRATER DETECTED (CONF. 98%)</span>
+                        </div>
+                        <div class="ai-safe-box" style="top: 54%; left: 58%; width: 130px; height: 90px;">
+                            <span class="ai-safe-label">SAFE LANDING ZONE (96.4%)</span>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic SVG vector connecting measuring points -->
+                    <svg class="measure-vector-svg" id="measure-vector-canvas">
+                        <line id="measure-line-element" x1="0" y1="0" x2="0" y2="0" stroke="#00f0ff" stroke-width="2" stroke-dasharray="4,4" style="display: none;"></line>
+                        <circle id="measure-dot-a" cx="0" cy="0" r="5" fill="#00f0ff" stroke="#fff" stroke-width="1.5" style="display: none;"></circle>
+                        <circle id="measure-dot-b" cx="0" cy="0" r="5" fill="#00f0ff" stroke="#fff" stroke-width="1.5" style="display: none;"></circle>
+                    </svg>
+                </div>
+
+                <!-- Bottom coordinates tickers -->
+                <div class="map-footer-coordinates">
+                    <span class="coord-item">LAT/LON: <span id="coordinates-value">{{ coordinates }}</span></span>
+                    <span class="coord-item">SW: -132.351W</span>
+                    <span class="coord-item">NE: +121.955E</span>
+                    <span class="coord-item">SCALE: 1:45,000</span>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: DECISION LOGS & SURFACE ROUGHNESS -->
+            <aside class="right-panel">
+                <!-- Parameters Score card -->
+                <section class="panel-section">
+                    <h2 class="section-title">
+                        <span>MISSION INTELLIGENCE</span>
+                        <span class="section-icon">ℹ</span>
+                    </h2>
+                    
+                    <div class="spec-table">
+                        <div class="spec-row">
+                            <span class="spec-lbl">MISSION SCORE:</span>
+                            <span class="spec-val highlight-green" id="mission-score">{{ mission_score }}</span>
+                        </div>
+                        <div class="spec-row">
+                            <span class="spec-lbl">SAFE AREA %:</span>
+                            <span class="spec-val highlight-cyan">78.2%</span>
+                        </div>
+                        <div class="spec-row">
+                            <span class="spec-lbl">MEAN ELEVATION:</span>
+                            <span class="spec-val">-120m</span>
+                        </div>
+                        <div class="spec-row">
+                            <span class="spec-lbl">MAX SLOPE:</span>
+                            <span class="spec-val highlight-red">28°</span>
+                        </div>
+                        <div class="spec-row">
+                            <span class="spec-lbl">TEMP PROFILE:</span>
+                            <span class="spec-val highlight-blue">-40°C</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Surface Roughness Spider Chart -->
+                <section class="panel-section">
+                    <h3 class="subsection-title">SURFACE ROUGHNESS INDEX</h3>
+                    <div class="spider-chart-container">
+                        <!-- Custom styled SVG spider polygon chart -->
+                        <svg viewBox="0 0 200 200" width="100%" height="160">
+                            <!-- Concentric rings -->
+                            <circle cx="100" cy="100" r="75" fill="none" stroke="#1a2a3e" stroke-width="1" />
+                            <circle cx="100" cy="100" r="50" fill="none" stroke="#1a2a3e" stroke-width="1" />
+                            <circle cx="100" cy="100" r="25" fill="none" stroke="#1a2a3e" stroke-width="1" />
+                            
+                            <!-- Radial dividers -->
+                            <line x1="100" y1="25" x2="100" y2="175" stroke="#1a2a3e" stroke-width="1" />
+                            <line x1="35" y1="62.5" x2="165" y2="137.5" stroke="#1a2a3e" stroke-width="1" />
+                            <line x1="35" y1="137.5" x2="165" y2="62.5" stroke="#1a2a3e" stroke-width="1" />
+
+                            <!-- Axis labels -->
+                            <text x="100" y="15" fill="#64748b" font-size="8" text-anchor="middle">SLOPE</text>
+                            <text x="185" y="65" fill="#64748b" font-size="8" text-anchor="middle">ROCKS</text>
+                            <text x="180" y="150" fill="#64748b" font-size="8" text-anchor="middle">CRATERS</text>
+                            <text x="100" y="195" fill="#64748b" font-size="8" text-anchor="middle">SIGNAL</text>
+                            <text x="20" y="150" fill="#64748b" font-size="8" text-anchor="middle">POWER</text>
+                            <text x="20" y="65" fill="#64748b" font-size="8" text-anchor="middle">THERMAL</text>
+
+                            <!-- Spider polygon data -->
+                            <polygon id="spider-polygon" points="100,45 155,75 145,130 100,165 45,135 55,70" fill="rgba(0, 240, 255, 0.25)" stroke="#00f0ff" stroke-width="1.5" />
+                        </svg>
+                    </div>
+                </section>
+
+                <!-- AI Log Terminal Section -->
+                <section class="panel-section terminal-section">
+                    <h3 class="subsection-title">AI DECISION LOG FEED</h3>
+                    <div class="terminal-logs-container" id="terminal-decision-log">
+                        {% for log in operational_logs %}
+                        <div class="log-line">
+                          <span class="log-time">[{{ log.time }}]</span>
+                          <span class="log-msg">{{ log.message }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+            </aside>
+
+        </div>
+
+        <!-- =========================================================================
+             SCREEN 2 VIEWPORT: LANDING RECOMMENDATION (Initially Hidden, switched via JS)
+             ========================================================================= -->
+        <div class="viewport-screen" id="view-landing-recommendation">
+            
+            <!-- LEFT PANEL: OPERATIONS CONSOLE STEPS -->
+            <aside class="left-panel">
+                <section class="panel-section">
+                    <h2 class="section-title">
+                        <span>OPERATIONS CONSOLE</span>
+                        <span class="section-icon">⚙</span>
+                    </h2>
+
+                    <!-- Timeline flow -->
+                    <div class="timeline-container">
+                        <div class="timeline-line"></div>
+                        
+                        <!-- Step 1 -->
+                        <div class="timeline-node complete">
+                            <div class="node-marker">✓</div>
+                            <div class="node-content">
+                                <div class="node-step">STEP 1</div>
+                                <h4 class="node-title">Data Ingestion</h4>
+                                <p class="node-desc">DEM files loaded and parsed</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="timeline-node complete">
+                            <div class="node-marker">✓</div>
+                            <div class="node-content">
+                                <div class="node-step">STEP 2</div>
+                                <h4 class="node-title">Terrain Mapping</h4>
+                                <p class="node-desc">Grid overlays and high-res scan</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div class="timeline-node complete">
+                            <div class="node-marker">✓</div>
+                            <div class="node-content">
+                                <div class="node-step">STEP 3</div>
+                                <h4 class="node-title">Surface Analysis</h4>
+                                <p class="node-desc">Contour gradient mapping run</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 4 -->
+                        <div class="timeline-node complete">
+                            <div class="node-marker">✓</div>
+                            <div class="node-content">
+                                <div class="node-step">STEP 4</div>
+                                <h4 class="node-title">AI Models &amp; Simulation</h4>
+                                <p class="node-desc">YOLO neural fragment analysis</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 5 - Selected Active -->
+                        <div class="timeline-node active">
+                            <div class="node-marker ring-pulse"></div>
+                            <div class="node-content active-box">
+                                <div class="node-step highlighted">STEP 5 ACTIVE</div>
+                                <h4 class="node-title">Landing Recommendation</h4>
+                                <p class="node-desc">Optimizing telemetry confidence margins</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 6 - Pending -->
+                        <div class="timeline-node pending">
+                            <div class="node-marker"></div>
+                            <div class="node-content">
+                                <div class="node-step">STEP 6</div>
+                                <h4 class="node-title">Trajectory Planning</h4>
+                                <p class="node-desc">Orbital vector delegation</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Subsystem status indicators -->
+                <section class="panel-section">
+                    <h3 class="subsection-title">SYSTEM MONITOR FEED</h3>
+                    <div class="monitor-feed">
+                        <div class="monitor-row">
+                            <span class="mon-lbl">POWER GRID:</span>
+                            <span class="mon-val green"><span class="small-led green"></span> STABLE</span>
+                        </div>
+                        <div class="monitor-row">
+                            <span class="mon-lbl">SATCOM:</span>
+                            <span class="mon-val green"><span class="small-led green"></span> ONLINE</span>
+                        </div>
+                        <div class="monitor-row">
+                            <span class="mon-lbl">AI ENGINE:</span>
+                            <span class="mon-val green"><span class="small-led green"></span> OPTIMAL</span>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- CENTER PANEL: LANDING SITES RADAR TRACKER -->
+            <section class="center-panel">
+                <div class="floating-map-actions">
+                    <div class="map-sub-info">TARGET SITE RADAR SELECTOR</div>
+                </div>
+
+                <!-- Main lunar surface map overlay with sites -->
+                <div class="map-canvas-frame scanline-effect" id="landing-map-container">
+                    <img src="https://images.unsplash.com/photo-1447433589675-4adf569200c1?auto=format&fit=crop&q=80&w=1200" alt="Lunar Contours" class="map-terrain-underlay">
+
+                    <!-- Canvas S-band target markers -->
+                    <div class="map-targets-hud">
+                        <!-- Connecting vector grid -->
+                        <svg class="connecting-line-svg" width="100%" height="100%">
+                            <line x1="35%" y1="40%" x2="65%" y2="30%" stroke="rgba(0, 136, 255, 0.4)" stroke-width="1" stroke-dasharray="3,3" />
+                            <line x1="65%" y1="30%" x2="70%" y2="60%" stroke="rgba(0, 136, 255, 0.4)" stroke-width="1" stroke-dasharray="3,3" />
+                            <line x1="70%" y1="60%" x2="55%" y2="82%" stroke="rgba(0, 136, 255, 0.4)" stroke-width="1" stroke-dasharray="3,3" />
+                            <line x1="55%" y1="82%" x2="42%" y2="78%" stroke="rgba(0, 136, 255, 0.4)" stroke-width="1" stroke-dasharray="3,3" />
+                        </svg>
+
+                        <!-- Dynamic Site Buttons on Map -->
+                        {% for site in sites %}
+                        <div class="target-node {% if site.id == 'site-alpha' %}active-target{% endif %}" 
+                             style="left: {{ '35%' if site.id == 'site-alpha' else '65%' if site.id == 'site-bravo' else '70%' if site.id == 'site-charlie' else '42%' if site.id == 'site-delta' else '55%' if site.id == 'site-echo' }}; 
+                                    top: {{ '40%' if site.id == 'site-alpha' else '30%' if site.id == 'site-bravo' else '60%' if site.id == 'site-charlie' else '78%' if site.id == 'site-delta' else '82%' if site.id == 'site-echo' }};"
+                             onclick="selectLandingSite('{{ site.id }}')"
+                             id="map-node-{{ site.id }}">
+                            <div class="concentric-ring ring-1"></div>
+                            <div class="concentric-ring ring-2"></div>
+                            <div class="solid-center-dot"></div>
+                            <div class="target-node-tag">{{ site.name }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Geographical Scale HUD -->
+                    <div class="geographic-scale">
+                        <span class="scale-point">0</span>
+                        <div class="scale-fill-bar">
+                            <div class="fill" style="width: 50%;"></div>
+                        </div>
+                        <span class="scale-point">250 km</span>
+                    </div>
+                </div>
+
+                <!-- Coordinates ticker footer -->
+                <div class="map-footer-coordinates">
+                    <span class="coord-item">TARGET LOCKED: <span id="landing-coordinates">LAT 25.4° N, LON 138.2° E</span></span>
+                    <span class="coord-item">RESOLUTION: 0.12M</span>
+                    <span class="coord-item">S-BAND LINK: ACTIVE</span>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: RECOMMENDATIONS COMPARISONS -->
+            <aside class="right-panel">
+                <!-- Summary Recommendation Banner -->
+                <div class="recommendation-banner" id="rec-banner-card">
+                    <div class="banner-badge-row">
+                        <span class="banner-card-lbl">AI RECOMMENDATION SUMMARY</span>
+                        <span class="banner-badge">OPTIMAL</span>
+                    </div>
+                    <h3 class="banner-selected-site">SELECTED LOCATION: <span class="green" id="selected-site-title">SITE ALPHA</span></h3>
+                    <p class="banner-summary-desc" id="selected-site-summary">
+                        Mare Tranquillitatis Sector Alpha. Exceptional flat terrain, zero active seismic drift, direct-line-of-sight signal with Lunar Gateway.
+                    </p>
+                    <div class="banner-footer-time">
+                        <span>CALIBRATED OVER ORBITERS:</span>
+                        <span>2026-07-14 14:32:45 UTC</span>
+                    </div>
+                </div>
+
+                <!-- Sites dynamic selection scroll card group -->
+                <div class="comparison-scroll-deck">
+                    <h4 class="deck-title">LANDING SITES PROFILE REGISTRY</h4>
+
+                    {% for site in sites %}
+                    <div class="site-registry-card {% if site.id == 'site-alpha' %}selected{% endif %}" 
+                         id="site-card-{{ site.id }}" 
+                         onclick="selectLandingSite('{{ site.id }}')">
+                        <div class="card-top-row">
+                            <div>
+                                <h5 class="card-site-name">{{ site.name }}</h5>
+                                <span class="card-site-coords">{{ site.coordinates }}</span>
+                            </div>
+                            <div class="card-top-right">
+                                <span class="card-score-lbl">SAFETY INDEX:</span>
+                                <span class="card-score-val">{{ site.safety_score }} / 100</span>
+                            </div>
+                        </div>
+
+                        <!-- Card Spec grid details -->
+                        <div class="card-grid-specs">
+                            <div class="grid-cell">
+                                <span class="cell-lbl">SLOPE:</span>
+                                <span class="cell-val">{{ site.slope }}</span>
+                            </div>
+                            <div class="grid-cell">
+                                <span class="cell-lbl">ROCKS:</span>
+                                <span class="cell-val">{{ site.rock_density }}</span>
+                            </div>
+                            <div class="grid-cell">
+                                <span class="cell-lbl">HAZARDS:</span>
+                                <span class="cell-val {% if site.hazard_probability == 'LOW' %}green{% else %}yellow{% endif %}">{{ site.hazard_probability }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Hidden extra information shown conditionally via JS class toggle -->
+                        <div class="card-expanded-drawer">
+                            <p class="expanded-desc">{{ site.description }}</p>
+                            
+                            <!-- Confidence progress gauge segment -->
+                            <div class="gauge-sub-box">
+                                <div class="gauge-texts">
+                                    <span class="gauge-lbl">AI SYSTEM CLASSIFICATION:</span>
+                                    <span class="gauge-sub">HUD CONFIDENCE DIAL</span>
+                                </div>
+                                <div class="gauge-circle-hud">
+                                    <span class="gauge-val-text">{{ site.confidence }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Massive Launch trigger button -->
+                <button class="btn btn-primary launch-telemetry-btn" onclick="executeLandingDispatch()" id="btn-execute-landing">
+                    🎯 EXECUTE LANDING SEQUENCE
+                </button>
+            </aside>
+
+        </div>
+
+    </main>
+
+    <!-- =========================================================================
+         FOOTER SYSTEMS DIAGNOSTICS BAR
+         ========================================================================= -->
+    <footer class="main-footer">
+        <div class="footer-diagnostics">
+            <span class="diag-header">SYSTEM DIAGNOSTICS:</span>
+            <span class="diag-item">CPU: <span class="green" id="cpu-load">{{ cpu_load }}</span></span>
+            <span class="diag-divider">|</span>
+            <span class="diag-item">GPU MAPPING: <span class="green" id="gpu-load">{{ gpu_load }}</span></span>
+            <span class="diag-divider">|</span>
+            <span class="diag-item">TELEMETRY LINK: <span class="green" id="comms-link">{{ comms_link }}</span></span>
+        </div>
+        <div class="footer-timer">
+            <div class="mission-elapsed-box">
+                <span class="elapsed-lbl">MISSION ELAPSED:</span>
+                <span class="elapsed-value" id="mission-timer">02h 45m 30s</span>
+            </div>
+            <span class="diag-divider">|</span>
+            <span class="footer-credit">DSR CHANDRAYAAN-OPS-CENTER</span>
+        </div>
+    </footer>
+
+    <!-- =========================================================================
+         MODALS LAYERS
+         ========================================================================= -->
+    
+    <!-- DEM File Uploader Modal -->
+    <div class="modal-backdrop" id="upload-modal" style="display: none;">
+        <div class="modal-card">
+            <button class="modal-close" onclick="closeUploadModal()">×</button>
+            <div class="modal-header">
+                <h3>▲ LOAD DIGITAL ELEVATION MODEL (DEM)</h3>
+                <p>Ingest high-density moon terrain contour grids to re-compute path clearance safety parameters.</p>
+            </div>
+            
+            <div class="drop-zone" id="drag-drop-box" ondragover="event.preventDefault(); this.classList.add('dragging')" ondragleave="this.classList.remove('dragging')" ondrop="handleDemoFileDrop(event)">
+                <span class="drop-icon">▲</span>
+                <span class="drop-title">Drag and drop raw DEM file here or <span class="highlight-cyan" onclick="simulateDemoFileSelection()">click to select</span></span>
+                <span class="drop-sub">Formats: .RAW, .DEM, .BIN (Max 50MB)</span>
+            </div>
+
+            <div class="upload-progress-container" id="upload-progress-card" style="display: none;">
+                <div class="progress-labels">
+                    <span>PROCESSING SPATIAL DEM MATRIX...</span>
+                    <span id="upload-progress-pct">0%</span>
+                </div>
+                <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="upload-progress-bar"></div>
+                </div>
+            </div>
+
+            <div class="modal-warning">
+                <span class="warning-icon">⚠</span>
+                <p>Warning: Ingesting high-density DEM grids overrides current auto-navigation matrices. Re-calibration required post-dispatch.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Landing Execution Command Modal -->
+    <div class="modal-backdrop" id="dispatch-modal" style="display: none;">
+        <div class="modal-card border-cyan">
+            <button class="modal-close" onclick="closeDispatchModal()">×</button>
+            <div class="modal-header">
+                <h3 class="cyan">🎯 CRITICAL COMMAND DISPATCH</h3>
+                <p class="cyan">DELEGATING DESCENT AND TOUCHDOWN SEQUENCES</p>
+            </div>
+            
+            <div class="dispatch-steps-list">
+                <div class="dispatch-step-row" id="dstep-1">
+                    <span class="step-indicator"></span>
+                    <div class="step-txts">
+                        <div class="title">TRANSMITTING COORDINATES MATRIX</div>
+                        <div class="sub">Targeting Latitude/Longitude profiles for Selected Site</div>
+                    </div>
+                </div>
+                <div class="dispatch-step-row" id="dstep-2">
+                    <span class="step-indicator"></span>
+                    <div class="step-txts">
+                        <div class="title">CALIBRATING ONBOARD OPTICAL TRACKERS</div>
+                        <div class="sub">Lunar Star-sensor synchronization locking</div>
+                    </div>
+                </div>
+                <div class="dispatch-step-row" id="dstep-3">
+                    <span class="step-indicator"></span>
+                    <div class="step-txts">
+                        <div class="title">DISPATCHING ROVER DYNAMICS MATRIX</div>
+                        <div class="sub">A* obstacle grid data transfer complete</div>
+                    </div>
+                </div>
+                <div class="dispatch-step-row" id="dstep-4">
+                    <span class="step-indicator"></span>
+                    <div class="step-txts">
+                        <div class="title">CONFIRMING OPERATIONAL TOUCHDOWN DELEGATION</div>
+                        <div class="sub">Awaiting operator final manual authorization keys</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary launch-telemetry-btn" onclick="advanceDispatchStep()" id="btn-advance-dispatch">
+                PROCEED TO NEXT TELEMETRY SEQUENCE
+            </button>
+        </div>
+    </div>
+
+    <!-- Link to the Vanilla JavaScript logic -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "JetBrains Mono", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-cyber-bg: #05070D;
+  --color-panel-bg: #0D1320;
+  --color-panel-border: #1E2A3A;
+  --color-cyber-cyan: #00D4FF;
+  --color-cyber-green: #00FF9D;
+  --color-cyber-blue: #0088ff;
+  --color-cyber-red: #FF4D4D;
+  --color-cyber-yellow: #FFC107;
+  --color-text-secondary: #6B7684;
+
+  /* Override slate colors to align with the deep charcoal/black design */
+  --color-slate-950: #05070D;
+  --color-slate-900: #0D1320;
+  --color-slate-800: #1E2A3A;
+  --color-slate-700: #26354a;
+  --color-slate-600: #40536e;
+  --color-slate-500: #6B7684;
+  --color-slate-400: #94a3b8;
+  --color-slate-300: #cbd5e1;
+  --color-slate-200: #e2e8f0;
+  --color-slate-100: #f1f5f9;
+}
+
+/* Custom glow effects and scrollbar stylings for the dark military GIS aesthetic */
+@layer base {
+  body {
+    background-color: var(--color-cyber-bg);
+    background-image: 
+        /* Starfield background overlay */
+        radial-gradient(circle, rgba(232, 237, 244, 0.12) 1px, transparent 1px),
+        radial-gradient(circle, rgba(0, 212, 255, 0.08) 1.5px, transparent 1.5px),
+        /* Faint global tactical coordinate grid lines */
+        linear-gradient(rgba(30, 42, 58, 0.15) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 42, 58, 0.15) 1px, transparent 1px);
+    background-size: 90px 90px, 200px 200px, 45px 45px, 45px 45px;
+    background-position: 0 0, 40px 40px, 0 0, 0 0;
+    color: var(--color-cyber-cyan);
+    font-family: var(--font-mono);
+    overflow-x: hidden;
+    animation: grid-drift-bg 120s linear infinite;
+  }
+}
+
+@keyframes grid-drift-bg {
+  0% { background-position: 0 0, 40px 40px, 0 0, 0 0; }
+  100% { background-position: 90px 90px, 240px 240px, 45px 45px, 45px 45px; }
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #05070D;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-panel-border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-cyber-cyan);
+}
+
+/* Cybernetic Glowing animations */
+@keyframes pulse-cyan {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(0, 212, 255, 0.2);
+    border-color: rgba(0, 212, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
+    border-color: rgba(0, 212, 255, 1);
+  }
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.8);
+  }
+}
+
+.glow-cyan-active {
+  animation: pulse-cyan 3s infinite;
+}
+
+.glow-dot-green {
+  animation: pulse-green 2s infinite;
+}
+
+/* CRT scanline effect on maps */
+.scanline-effect {
+  position: relative;
+}
+.scanline-effect::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: 
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 212, 255, 0.03) 50%),
+    linear-gradient(0deg, rgba(0, 212, 255, 0) 0%, rgba(0, 212, 255, 0.04) 10%, rgba(0, 212, 255, 0.1) 12%, rgba(0, 212, 255, 0.04) 14%, rgba(0, 212, 255, 0) 40%);
+  background-size: 100% 4px, 100% 800px;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.65;
+  animation: scanline-sweep 24s linear infinite;
+}
+
+@keyframes scanline-sweep {
+  0% { background-position: 0 0, 0 -800px; }
+  100% { background-position: 0 0, 0 800px; }
+}
+
+/* Custom Crater labels for React GIS Map */
+.crater-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--color-text-secondary);
+  opacity: 0.65;
+  pointer-events: none;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.crater-label::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  background-color: var(--color-text-secondary);
+  border-radius: 50%;
+}
+

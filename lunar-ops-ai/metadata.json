@@ -1,0 +1,8 @@
+{
+  "name": "Lunar Ops AI",
+  "description": "High-fidelity Lunar Mission Control operations console and landing site analysis dashboard, presenting AI-driven hazard mapping and route planning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
