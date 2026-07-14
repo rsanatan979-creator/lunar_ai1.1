@@ -9,18 +9,25 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-def compute_slope(elevation: np.ndarray, pixel_size: float = 1.0) -> np.ndarray:
+def compute_slope(elevation: np.ndarray, pixel_size = 1.0) -> np.ndarray:
     """
     Compute slope in degrees using the gradient of the elevation surface.
 
     Args:
         elevation: 2-D float32 array of elevation values (metres).
         pixel_size: Ground resolution of one pixel in metres (from DEM metadata).
+                    Can be a float or a tuple/list of (x_res, y_res).
 
     Returns:
         slope_deg: 2-D float32 array of slope values in degrees.
     """
-    dy, dx = np.gradient(elevation, pixel_size)
+    if isinstance(pixel_size, (tuple, list)):
+        x_res, y_res = pixel_size
+    else:
+        x_res = y_res = pixel_size
+
+    # y_res corresponds to axis 0 spacing, x_res corresponds to axis 1 spacing
+    dy, dx = np.gradient(elevation, y_res, x_res)
     slope_rad = np.arctan(np.sqrt(dx ** 2 + dy ** 2))
     slope_deg = np.degrees(slope_rad)
     return slope_deg.astype(np.float32)

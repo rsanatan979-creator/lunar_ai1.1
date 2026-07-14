@@ -158,6 +158,8 @@ export default function App() {
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [uploadedDemFile, setUploadedDemFile] = useState<File | null>(null);
+  const [showAdvancedTelemetry, setShowAdvancedTelemetry] = useState(false);
+
 
   // Interactive notifications state
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -354,11 +356,13 @@ export default function App() {
       }
       const data: ApiResponse = await runRes.json();
       setApiData(data);
+      setActiveTab('LANDING RECOMMENDATION');
 
       // Update active site to best result
       if (data.landing_sites.length > 0) {
         setActiveSiteId(`site-${data.landing_sites[0].name.toLowerCase().replace('site ', '')}`);
       }
+
 
       setNotifications(prev => [{
         id: Date.now().toString(),
@@ -574,6 +578,64 @@ export default function App() {
       </nav>
 
       {/* =========================================================================
+          ONBOARDING OPERATIONAL CHECKLIST & TELEMETRY TOGGLE
+          ========================================================================= */}
+      <div className="bg-slate-900/60 border-b border-panel-border px-6 py-2 flex flex-col md:flex-row items-start md:items-center justify-between text-xs font-mono gap-3 select-none" id="onboarding-guide">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <span className="text-slate-500 font-bold tracking-wider">MISSION WORKFLOW:</span>
+          
+          <div className="flex items-center space-x-2">
+            <span className={`w-5 h-5 flex items-center justify-center rounded-full font-bold text-[9px] ${
+              uploadedFile ? 'bg-cyber-green text-slate-950' : 'bg-cyber-cyan text-slate-950 animate-pulse font-black'
+            }`}>1</span>
+            <span className={uploadedFile ? 'text-slate-500 line-through decoration-cyber-green/50' : 'text-cyber-cyan font-bold'}>UPLOAD SURFACE DATA</span>
+          </div>
+
+          <span className="text-slate-600">➔</span>
+
+          <div className="flex items-center space-x-2">
+            <span className={`w-5 h-5 flex items-center justify-center rounded-full font-bold text-[9px] ${
+              apiData ? 'bg-cyber-green text-slate-950' : (uploadedFile ? 'bg-cyber-cyan text-slate-950 animate-pulse font-black' : 'bg-slate-800 text-slate-500')
+            }`}>2</span>
+            <span className={apiData ? 'text-slate-500 line-through decoration-cyber-green/50' : (uploadedFile ? 'text-cyber-cyan font-bold' : 'text-slate-500')}>RUN AI PIPELINE</span>
+          </div>
+
+          <span className="text-slate-600">➔</span>
+
+          <div className="flex items-center space-x-2">
+            <span className={`w-5 h-5 flex items-center justify-center rounded-full font-bold text-[9px] ${
+              apiData ? 'bg-cyber-cyan text-slate-950 animate-pulse font-black' : 'bg-slate-800 text-slate-500'
+            }`}>3</span>
+            <span className={apiData ? 'text-cyber-green font-bold' : 'text-slate-500'}>EVALUATE LANDING SITE & ROVER PATH</span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            setShowAdvancedTelemetry(!showAdvancedTelemetry);
+            setNotifications(prev => [
+              {
+                id: Date.now().toString(),
+                time: new Date().toUTCString().slice(17, 25),
+                text: `CONSOLE: Advanced telemetry display ${!showAdvancedTelemetry ? 'ENABLED' : 'DISABLED'}.`,
+                type: 'info'
+              },
+              ...prev
+            ]);
+          }}
+          className={`text-[10px] px-3 py-1 border rounded transition-all font-bold ${
+            showAdvancedTelemetry
+              ? 'border-cyber-cyan bg-cyber-cyan/15 text-cyber-cyan'
+              : 'border-panel-border bg-slate-950 text-slate-400 hover:text-white hover:border-cyber-cyan'
+          }`}
+          id="btn-toggle-telemetry"
+        >
+          {showAdvancedTelemetry ? '[-] HIDE ADVANCED PANELS' : '[+] SHOW ADVANCED PANELS'}
+        </button>
+      </div>
+
+
+      {/* =========================================================================
           MAIN MULTI-SCREEN LAYOUT
           ========================================================================= */}
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative" id="main-dashboard-body">
@@ -601,71 +663,10 @@ export default function App() {
                 <div className="flex items-center space-x-2.5">
                   <div className="w-2 h-2 rounded-full bg-cyber-green glow-dot-green"></div>
                   <div>
-                    <h3 className="text-xs font-bold text-white tracking-wide" id="dem-state-label">DEM LOADED</h3>
-                    <p className="text-[10px] text-slate-500 font-mono">FILE: T_TRANQ_82S_V3.RAW</p>
+                    <h3 className="text-xs font-bold text-white tracking-wide" id="dem-state-label">{uploadedFile ? "DEM LOADED" : "DEFAULT DEM ACTIVE"}</h3>
+                    <p className="text-[10px] text-slate-500 font-mono">FILE: {uploadedFile || "GeoTIFF.tif"}</p>
                   </div>
                 </div>
-                {/* Visual mini progress bars */}
-                <div className="flex flex-col items-end space-y-1">
-                  <div className="flex space-x-0.5">
-                    {[...Array(8)].map((_, i) => (
-                      <div key={i} className="w-1 h-3 bg-cyber-cyan rounded-sm"></div>
-                    ))}
-                    {[...Array(2)].map((_, i) => (
-                      <div key={i} className="w-1 h-3 bg-slate-800 rounded-sm"></div>
-                    ))}
-                  </div>
-                  <span className="text-[9px] font-mono text-slate-400">0.03 MB</span>
-                </div>
-              </div>
-
-              {/* Pipeline Step Progress Visualizer */}
-              <div className="space-y-4" id="pipeline-status-indicators">
-                {/* Step indicators with styled glowing levels */}
-                {[
-                  { name: 'ANALYSIS', level: 10, max: 10, color: 'bg-cyber-cyan', subText: 'PROGRESS: 100% | PROC_SENS_O', status: 'ACTIVE' },
-                  { name: 'SLOPE', level: 9, max: 10, color: 'bg-cyber-blue', subText: 'SLOPE ANALYSIS COMPLETED', status: 'STABLE' },
-                  { name: 'HAZARDS', level: 8, max: 10, color: 'bg-cyber-red', subText: '12 ACTIVE HAZARD GRIDS FLAGGED', status: 'WARNING' },
-                  { name: 'LANDING', level: 7, max: 10, color: 'bg-cyber-green', subText: 'LANDING SCORE: 96% | OPTIMAL', status: 'RECOMMENDED' },
-                  { name: 'PATH', level: 6, max: 10, color: 'bg-cyber-yellow', subText: 'A* PATH GENERATED | RE-COMPUTE', status: 'READY' },
-                ].map((step, idx) => (
-                  <div key={step.name} className="bg-slate-900/60 border border-panel-border/60 p-3 rounded hover:border-panel-border transition-colors">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-[10px] bg-slate-800 border border-panel-border text-slate-300 font-mono font-bold w-5 h-5 flex items-center justify-center rounded">
-                          0{idx+1}
-                        </span>
-                        <span className="text-xs font-mono font-bold tracking-wider text-slate-200">{step.name}</span>
-                      </div>
-                      <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${
-                        step.status === 'WARNING' ? 'bg-cyber-red/20 text-cyber-red border border-cyber-red/30' :
-                        step.status === 'RECOMMENDED' ? 'bg-cyber-green/20 text-cyber-green border border-cyber-green/30' :
-                        'bg-slate-800 text-slate-300 border border-panel-border'
-                      }`}>
-                        {step.status}
-                      </span>
-                    </div>
-
-                    {/* Progress grid segments */}
-                    <div className="flex items-center space-x-2">
-                      <div className="flex-1 flex gap-[3px]">
-                        {[...Array(step.max)].map((_, i) => (
-                          <div
-                            key={i}
-                            className={`flex-1 h-2 rounded-sm transition-all duration-500 ${
-                              i < step.level ? step.color : 'bg-slate-800'
-                            }`}
-                          ></div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <p className="text-[9px] font-mono text-slate-400 mt-1.5 flex items-center justify-between">
-                      <span>{step.subText}</span>
-                      <span className="text-slate-600 font-bold">10-SEG HUD</span>
-                    </p>
-                  </div>
-                ))}
               </div>
 
               {/* Dynamic Slope Threshold Slider */}
@@ -742,36 +743,91 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Telemetry LED Status Grid */}
-              <div className="bg-slate-950/60 border border-panel-border p-3.5 rounded" id="card-telemetry-leds">
-                <h4 className="text-[10px] font-mono font-bold uppercase text-slate-500 tracking-wider mb-2.5 border-b border-panel-border/30 pb-1">
-                  TELEMETRY SUBSYSTEMS
-                </h4>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { name: 'GPS STATUS', id: 'gps-status', desc: 'SATELLITES', status: 'LOCK 8/8', active: true },
-                    { name: 'IMU STATUS', id: 'imu-status', desc: 'GYRO SENSORS', status: 'STABLE', active: true },
-                    { name: 'POWER GRID', id: 'power', desc: '87% BATTERY', status: 'SOLAR AUX', active: true },
-                    { name: 'S-BAND LINK', id: 'signal', desc: 'SIGNAL STRONG', status: '98% STRENGTH', active: true }
-                  ].map((sys) => (
-                    <div
-                      key={sys.name}
-                      className="bg-slate-900 border border-panel-border/80 rounded p-1.5 flex flex-col items-center justify-between text-center cursor-pointer hover:border-cyber-cyan transition-colors"
-                      id={`telemetry-${sys.id}`}
-                    >
-                      <span className="text-[8px] font-mono font-bold text-slate-400 truncate w-full">{sys.name}</span>
-                      
-                      {/* LED Glow indicator */}
-                      <div className="my-2 relative flex items-center justify-center">
-                        <div className="w-3.5 h-3.5 bg-cyber-green rounded-full glow-dot-green border border-white/20"></div>
-                        <div className="absolute w-5 h-5 bg-cyber-green/30 rounded-full animate-ping pointer-events-none"></div>
-                      </div>
+              {/* Advanced Panels (Conditional) */}
+              {showAdvancedTelemetry && (
+                <>
+                  {/* Pipeline Step Progress Visualizer */}
+                  <div className="space-y-4" id="pipeline-status-indicators">
+                    {/* Step indicators with styled glowing levels */}
+                    {[
+                      { name: 'ANALYSIS', level: 10, max: 10, color: 'bg-cyber-cyan', subText: 'PROGRESS: 100% | PROC_SENS_O', status: 'ACTIVE' },
+                      { name: 'SLOPE', level: 9, max: 10, color: 'bg-cyber-blue', subText: 'SLOPE ANALYSIS COMPLETED', status: 'STABLE' },
+                      { name: 'HAZARDS', level: 8, max: 10, color: 'bg-cyber-red', subText: `${apiData?.summary?.hazard_count ?? 12} ACTIVE HAZARD GRIDS FLAGGED`, status: 'WARNING' },
+                      { name: 'LANDING', level: 7, max: 10, color: 'bg-cyber-green', subText: `LANDING SCORE: ${apiData?.summary?.mission_score ?? 96}% | OPTIMAL`, status: 'RECOMMENDED' },
+                      { name: 'PATH', level: 6, max: 10, color: 'bg-cyber-yellow', subText: apiData ? `A* PATH: {apiData.rover_path.estimated_distance_m}m | READY` : 'A* PATH GENERATED | RE-COMPUTE', status: 'READY' },
+                    ].map((step, idx) => (
+                      <div key={step.name} className="bg-slate-900/60 border border-panel-border/60 p-3 rounded hover:border-panel-border transition-colors">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] bg-slate-800 border border-panel-border text-slate-300 font-mono font-bold w-5 h-5 flex items-center justify-center rounded">
+                              0{idx+1}
+                            </span>
+                            <span className="text-xs font-mono font-bold tracking-wider text-slate-200">{step.name}</span>
+                          </div>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${
+                            step.status === 'WARNING' ? 'bg-cyber-red/20 text-cyber-red border border-cyber-red/30' :
+                            step.status === 'RECOMMENDED' ? 'bg-cyber-green/20 text-cyber-green border border-cyber-green/30' :
+                            'bg-slate-800 text-slate-300 border border-panel-border'
+                          }`}>
+                            {step.status}
+                          </span>
+                        </div>
 
-                      <span className="text-[7px] font-mono font-bold text-slate-500 truncate w-full uppercase">{sys.status}</span>
+                        {/* Progress grid segments */}
+                        <div className="flex items-center space-x-2">
+                          <div className="flex-1 flex gap-[3px]">
+                            {[...Array(step.max)].map((_, i) => (
+                              <div
+                                key={i}
+                                className={`flex-1 h-2 rounded-sm transition-all duration-500 ${
+                                  i < step.level ? step.color : 'bg-slate-800'
+                                }`}
+                              ></div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <p className="text-[9px] font-mono text-slate-400 mt-1.5 flex items-center justify-between">
+                          <span>{step.subText}</span>
+                          <span className="text-slate-600 font-bold">10-SEG HUD</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Telemetry LED Status Grid */}
+                  <div className="bg-slate-950/60 border border-panel-border p-3.5 rounded" id="card-telemetry-leds">
+                    <h4 className="text-[10px] font-mono font-bold uppercase text-slate-500 tracking-wider mb-2.5 border-b border-panel-border/30 pb-1">
+                      TELEMETRY SUBSYSTEMS
+                    </h4>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { name: 'GPS STATUS', id: 'gps-status', desc: 'SATELLITES', status: 'LOCK 8/8', active: true },
+                        { name: 'IMU STATUS', id: 'imu-status', desc: 'GYRO SENSORS', status: 'STABLE', active: true },
+                        { name: 'POWER GRID', id: 'power', desc: '87% BATTERY', status: 'SOLAR AUX', active: true },
+                        { name: 'S-BAND LINK', id: 'signal', desc: 'SIGNAL STRONG', status: '98% STRENGTH', active: true }
+                      ].map((sys) => (
+                        <div
+                          key={sys.name}
+                          className="bg-slate-900 border border-panel-border/80 rounded p-1.5 flex flex-col items-center justify-between text-center cursor-pointer hover:border-cyber-cyan transition-colors"
+                          id={`telemetry-${sys.id}`}
+                        >
+                          <span className="text-[8px] font-mono font-bold text-slate-400 truncate w-full">{sys.name}</span>
+                          
+                          {/* LED Glow indicator */}
+                          <div className="my-2 relative flex items-center justify-center">
+                            <div className="w-3.5 h-3.5 bg-cyber-green rounded-full glow-dot-green border border-white/20"></div>
+                            <div className="absolute w-5 h-5 bg-cyber-green/30 rounded-full animate-ping pointer-events-none"></div>
+                          </div>
+
+                          <span className="text-[7px] font-mono font-bold text-slate-500 truncate w-full uppercase">{sys.status}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                </>
+              )}
+
 
             </aside>
 
@@ -1063,123 +1119,126 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Surface Roughness Polar/Radar Chart */}
-              <div className="bg-slate-900 border border-panel-border p-3 rounded" id="radar-chart-card">
-                <h3 className="text-xs font-mono font-bold tracking-wider text-slate-300 border-b border-panel-border/40 pb-1.5 mb-2 flex justify-between items-center">
-                  <span>SURFACE ROUGHNESS</span>
-                  <span className="text-[9px] text-cyber-cyan">REAL-TIME POLAR</span>
-                </h3>
+              {/* Surface Roughness Polar/Radar Chart (Advanced) */}
+              {showAdvancedTelemetry && (
+                <>
+                  <div className="bg-slate-900 border border-panel-border p-3 rounded" id="radar-chart-card">
+                    <h3 className="text-xs font-mono font-bold tracking-wider text-slate-300 border-b border-panel-border/40 pb-1.5 mb-2 flex justify-between items-center">
+                      <span>SURFACE ROUGHNESS</span>
+                      <span className="text-[9px] text-cyber-cyan">REAL-TIME POLAR</span>
+                    </h3>
 
-                <div className="flex justify-center my-1 relative">
-                  {/* SVG Custom Radar chart */}
-                  <svg width="190" height="190" viewBox="0 0 200 200" className="drop-shadow-[0_0_8px_rgba(0,240,255,0.15)]">
-                    {/* Concentric grid lines */}
-                    <circle cx="100" cy="100" r="75" fill="none" stroke="#1a2a3e" strokeWidth="1" />
-                    <circle cx="100" cy="100" r="55" fill="none" stroke="#1a2a3e" strokeWidth="1" />
-                    <circle cx="100" cy="100" r="35" fill="none" stroke="#1a2a3e" strokeWidth="1" />
-                    <circle cx="100" cy="100" r="15" fill="none" stroke="#1a2a3e" strokeWidth="1" />
+                    <div className="flex justify-center my-1 relative">
+                      {/* SVG Custom Radar chart */}
+                      <svg width="190" height="190" viewBox="0 0 200 200" className="drop-shadow-[0_0_8px_rgba(0,240,255,0.15)]">
+                        {/* Concentric grid lines */}
+                        <circle cx="100" cy="100" r="75" fill="none" stroke="#1a2a3e" strokeWidth="1" />
+                        <circle cx="100" cy="100" r="55" fill="none" stroke="#1a2a3e" strokeWidth="1" />
+                        <circle cx="100" cy="100" r="35" fill="none" stroke="#1a2a3e" strokeWidth="1" />
+                        <circle cx="100" cy="100" r="15" fill="none" stroke="#1a2a3e" strokeWidth="1" />
 
-                    {/* Radial axis lines */}
-                    {[0, 60, 120, 180, 240, 300].map((angle) => {
-                      const rad = (angle - 90) * (Math.PI / 180);
-                      return (
-                        <line
-                          key={angle}
-                          x1="100"
-                          y1="100"
-                          x2={100 + 75 * Math.cos(rad)}
-                          y2={100 + 75 * Math.sin(rad)}
-                          stroke="#1a2a3e"
-                          strokeWidth="1"
+                        {/* Radial axis lines */}
+                        {[0, 60, 120, 180, 240, 300].map((angle) => {
+                          const rad = (angle - 90) * (Math.PI / 180);
+                          return (
+                            <line
+                              key={angle}
+                              x1="100"
+                              y1="100"
+                              x2={100 + 75 * Math.cos(rad)}
+                              y2={100 + 75 * Math.sin(rad)}
+                              stroke="#1a2a3e"
+                              strokeWidth="1"
+                            />
+                          );
+                        })}
+
+                        {/* Axis Labels */}
+                        {[
+                          { text: 'SLOPE', x: 100, y: 15 },
+                          { text: 'ROCKS', x: 175, y: 55 },
+                          { text: 'CRATERS', x: 175, y: 150 },
+                          { text: 'SIGNAL', x: 100, y: 190 },
+                          { text: 'POWER', x: 25, y: 150 },
+                          { text: 'THERMAL', x: 20, y: 55 }
+                        ].map((lbl, idx) => (
+                          <text
+                            key={idx}
+                            x={lbl.x}
+                            y={lbl.y}
+                            fill="#64748b"
+                            fontSize="7"
+                            fontFamily="var(--font-mono)"
+                            textAnchor="middle"
+                            className="font-bold"
+                          >
+                            {lbl.text}
+                          </text>
+                        ))}
+
+                        {/* Filled Radar Data Area */}
+                        <polygon
+                          points={radarPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                          fill="rgba(0, 240, 255, 0.25)"
+                          stroke="#00f0ff"
+                          strokeWidth="1.5"
+                          className="transition-all duration-500"
                         />
-                      );
-                    })}
 
-                    {/* Axis Labels */}
-                    {[
-                      { text: 'SLOPE', x: 100, y: 15 },
-                      { text: 'ROCKS', x: 175, y: 55 },
-                      { text: 'CRATERS', x: 175, y: 150 },
-                      { text: 'SIGNAL', x: 100, y: 190 },
-                      { text: 'POWER', x: 25, y: 150 },
-                      { text: 'THERMAL', x: 20, y: 55 }
-                    ].map((lbl, idx) => (
-                      <text
-                        key={idx}
-                        x={lbl.x}
-                        y={lbl.y}
-                        fill="#64748b"
-                        fontSize="7"
-                        fontFamily="var(--font-mono)"
-                        textAnchor="middle"
-                        className="font-bold"
-                      >
-                        {lbl.text}
-                      </text>
-                    ))}
+                        {/* Interactive dots on vertices */}
+                        {radarPoints.map((p, i) => (
+                          <circle
+                            key={i}
+                            cx={p.x}
+                            cy={p.y}
+                            r="3"
+                            fill="#39ff14"
+                            stroke="#00f0ff"
+                            strokeWidth="1"
+                            className="transition-all duration-500"
+                          />
+                        ))}
+                      </svg>
+                    </div>
 
-                    {/* Filled Radar Data Area */}
-                    <polygon
-                      points={radarPoints.map(p => `${p.x},${p.y}`).join(' ')}
-                      fill="rgba(0, 240, 255, 0.25)"
-                      stroke="#00f0ff"
-                      strokeWidth="1.5"
-                      className="transition-all duration-500"
-                    />
+                    <div className="text-[9px] font-mono text-slate-500 text-center uppercase tracking-wider mt-2">
+                      HUD POLYGON BOUND TO AI PREDICTION MARGINS
+                    </div>
+                  </div>
 
-                    {/* Interactive dots on vertices */}
-                    {radarPoints.map((p, i) => (
-                      <circle
-                        key={i}
-                        cx={p.x}
-                        cy={p.y}
-                        r="3"
-                        fill="#39ff14"
-                        stroke="#00f0ff"
-                        strokeWidth="1"
-                        className="transition-all duration-500"
-                      />
-                    ))}
-                  </svg>
-                </div>
-
-                <div className="text-[9px] font-mono text-slate-500 text-center uppercase tracking-wider mt-2">
-                  HUD POLYGON BOUND TO AI PREDICTION MARGINS
-                </div>
-              </div>
-
-              {/* AI DECISION LOG */}
-              <div className="flex-1 flex flex-col bg-slate-900 border border-panel-border rounded p-3 min-h-[160px] overflow-hidden" id="card-ai-decision-log">
-                <h3 className="text-xs font-mono font-bold tracking-wider text-slate-300 border-b border-panel-border/40 pb-1.5 mb-2 flex justify-between items-center">
-                  <span>AI DECISION LOG</span>
-                  <Terminal className="w-3.5 h-3.5 text-cyber-cyan" />
-                </h3>
-                
-                <div className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px]" id="hazard-count">
-                  <AnimatePresence initial={false}>
-                    {notifications.map((log) => (
-                      <motion.div
-                        key={log.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        className={`p-2 rounded border border-transparent ${
-                          log.type === 'success' ? 'bg-cyber-green/15 text-cyber-green border-cyber-green/30' :
-                          log.type === 'warning' ? 'bg-cyber-yellow/15 text-cyber-yellow border-cyber-yellow/30' :
-                          'bg-slate-950/80 text-slate-300 border-panel-border/40'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[8px] text-slate-500 mb-1">
-                          <span className="font-bold uppercase">{log.type} LOG</span>
-                          <span>{log.time}</span>
-                        </div>
-                        <p className="leading-relaxed">{log.text}</p>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </div>
-
+                  {/* AI DECISION LOG */}
+                  <div className="flex-1 flex flex-col bg-slate-900 border border-panel-border rounded p-3 min-h-[160px] overflow-hidden" id="card-ai-decision-log">
+                    <h3 className="text-xs font-mono font-bold tracking-wider text-slate-300 border-b border-panel-border/40 pb-1.5 mb-2 flex justify-between items-center">
+                      <span>AI DECISION LOG</span>
+                      <Terminal className="w-3.5 h-3.5 text-cyber-cyan" />
+                    </h3>
+                    
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px]" id="hazard-count">
+                      <AnimatePresence initial={false}>
+                        {notifications.map((log) => (
+                          <motion.div
+                            key={log.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className={`p-2 rounded border border-transparent ${
+                              log.type === 'success' ? 'bg-cyber-green/15 text-cyber-green border-cyber-green/30' :
+                              log.type === 'warning' ? 'bg-cyber-yellow/15 text-cyber-yellow border-cyber-yellow/30' :
+                              'bg-slate-950/80 text-slate-300 border-panel-border/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[8px] text-slate-500 mb-1">
+                              <span className="font-bold uppercase">{log.type} LOG</span>
+                              <span>{log.time}</span>
+                            </div>
+                            <p className="leading-relaxed">{log.text}</p>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </>
+              )}
             </aside>
           </>
 
@@ -1190,134 +1249,137 @@ export default function App() {
              ========================================================================= */
           <>
             {/* COLUMN 1: OPERATIONS TIMELINE CONSOLE */}
-            <aside className="w-full lg:w-80 border-r border-panel-border bg-slate-950/80 p-4 flex flex-col space-y-5 overflow-y-auto" id="left-sidebar-timeline">
-              <div>
-                <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-slate-400 flex items-center justify-between border-b border-panel-border/60 pb-1.5">
-                  <span>OPERATIONS CONSOLE</span>
-                  <span className="text-[10px] bg-cyber-green/10 border border-cyber-green text-cyber-green px-1.5 py-0.2 rounded font-bold">
-                    ACTIVE
-                  </span>
-                </h2>
-              </div>
-
-              {/* TIMELINE LIST */}
-              <div className="relative pl-4 border-l-2 border-panel-border space-y-6 ml-2" id="timeline-flow-list">
-                
-                {/* Timeline Node 1 */}
-                <div className="relative">
-                  <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-500">STEP 1</span>
-                    <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
-                      Data Ingestion
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
-                    </h4>
-                    <p className="text-[10px] text-slate-500">DEM mapping files uploaded and matched</p>
-                  </div>
-                </div>
-
-                {/* Timeline Node 2 */}
-                <div className="relative">
-                  <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-500">STEP 2</span>
-                    <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
-                      Terrain Mapping
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
-                    </h4>
-                    <p className="text-[10px] text-slate-500">Coordinate grids overlay and spatial contours</p>
-                  </div>
-                </div>
-
-                {/* Timeline Node 3 */}
-                <div className="relative">
-                  <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-500">STEP 3</span>
-                    <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
-                      Surface Analysis
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
-                    </h4>
-                    <p className="text-[10px] text-slate-500">Slopes clearance profiles calculated</p>
-                  </div>
-                </div>
-
-                {/* Timeline Node 4 */}
-                <div className="relative">
-                  <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-500">STEP 4</span>
-                    <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
-                      AI Models & Simulation
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
-                    </h4>
-                    <p className="text-[10px] text-slate-500">YOLOv11 neural rock cluster detectors run</p>
-                  </div>
-                </div>
-
-                {/* Timeline Node 5 - Active state */}
-                <div className="relative">
-                  <div className="absolute -left-[25px] -top-0.5 w-4 h-4 rounded-full bg-slate-950 border-2 border-cyber-cyan flex items-center justify-center glow-cyan-active">
-                    <span className="w-1.5 h-1.5 bg-cyber-cyan rounded-full"></span>
-                  </div>
-                  <div className="border border-cyber-cyan/50 bg-cyber-cyan/5 p-2 rounded">
-                    <span className="text-[9px] font-mono text-cyber-cyan font-bold">CURRENT PROCESS STEP 5</span>
-                    <h4 className="text-xs font-mono font-bold text-white flex items-center gap-1">
-                      Landing Recommendation
-                    </h4>
-                    <p className="text-[10px] text-slate-400">Verifying safe locations and orbital telemetry</p>
-                  </div>
-                </div>
-
-                {/* Timeline Node 6 - Pending */}
-                <div className="relative opacity-40">
-                  <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-slate-800 border border-panel-border"></div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-500">STEP 6</span>
-                    <h4 className="text-xs font-mono font-bold text-slate-400">Trajectory Planning</h4>
-                    <p className="text-[10px] text-slate-500">Orbital calculations and fuel requirements</p>
-                  </div>
-                </div>
-
-                {/* Timeline Node 7 - Pending */}
-                <div className="relative opacity-40">
-                  <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-slate-800 border border-panel-border"></div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-500">STEP 7</span>
-                    <h4 className="text-xs font-mono font-bold text-slate-400">Mission Execution</h4>
-                    <p className="text-[10px] text-slate-500">Onboard guidance delegation sequences</p>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Subsystem Health Grid */}
-              <div className="bg-slate-900 border border-panel-border p-3.5 rounded space-y-2" id="subsystem-health-grid">
-                <h4 className="text-[10px] font-mono font-bold uppercase text-slate-400 tracking-wider mb-1">
-                  SYSTEM HEALTH INDEX
-                </h4>
-                <div className="space-y-1.5 text-xs font-mono" id="subsystem-list">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">CORE POWER GRID:</span>
-                    <span className="text-cyber-green font-bold flex items-center gap-1">
-                      <span className="w-2 h-2 bg-cyber-green rounded-full glow-dot-green"></span> STABLE
+            {showAdvancedTelemetry && (
+              <aside className="w-full lg:w-80 border-r border-panel-border bg-slate-950/80 p-4 flex flex-col space-y-5 overflow-y-auto" id="left-sidebar-timeline">
+                <div>
+                  <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-slate-400 flex items-center justify-between border-b border-panel-border/60 pb-1.5">
+                    <span>OPERATIONS CONSOLE</span>
+                    <span className="text-[10px] bg-cyber-green/10 border border-cyber-green text-cyber-green px-1.5 py-0.2 rounded font-bold">
+                      ACTIVE
                     </span>
+                  </h2>
+                </div>
+
+                {/* TIMELINE LIST */}
+                <div className="relative pl-4 border-l-2 border-panel-border space-y-6 ml-2" id="timeline-flow-list">
+                  
+                  {/* Timeline Node 1 */}
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
+                    <div>
+                      <span className="text-[9px] font-mono text-slate-500">STEP 1</span>
+                      <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
+                        Data Ingestion
+                        <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
+                      </h4>
+                      <p className="text-[10px] text-slate-500">DEM mapping files uploaded and matched</p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">S-BAND SATCOM:</span>
-                    <span className="text-cyber-green font-bold flex items-center gap-1">
-                      <span className="w-2 h-2 bg-cyber-green rounded-full glow-dot-green"></span> ONLINE
-                    </span>
+
+                  {/* Timeline Node 2 */}
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
+                    <div>
+                      <span className="text-[9px] font-mono text-slate-500">STEP 2</span>
+                      <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
+                        Terrain Mapping
+                        <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
+                      </h4>
+                      <p className="text-[10px] text-slate-500">Coordinate grids overlay and spatial contours</p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">AI DETECTOR ENGINE:</span>
-                    <span className="text-cyber-green font-bold flex items-center gap-1">
-                      <span className="w-2 h-2 bg-cyber-green rounded-full glow-dot-green"></span> OPTIMAL
-                    </span>
+
+                  {/* Timeline Node 3 */}
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
+                    <div>
+                      <span className="text-[9px] font-mono text-slate-500">STEP 3</span>
+                      <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
+                        Surface Analysis
+                        <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
+                      </h4>
+                      <p className="text-[10px] text-slate-500">Slopes clearance profiles calculated</p>
+                    </div>
+                  </div>
+
+                  {/* Timeline Node 4 */}
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-cyber-green border border-white"></div>
+                    <div>
+                      <span className="text-[9px] font-mono text-slate-500">STEP 4</span>
+                      <h4 className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1">
+                        AI Models & Simulation
+                        <CheckCircle2 className="w-3.5 h-3.5 text-cyber-green" />
+                      </h4>
+                      <p className="text-[10px] text-slate-500">YOLOv11 neural rock cluster detectors run</p>
+                    </div>
+                  </div>
+
+                  {/* Timeline Node 5 - Active state */}
+                  <div className="relative">
+                    <div className="absolute -left-[25px] -top-0.5 w-4 h-4 rounded-full bg-slate-950 border-2 border-cyber-cyan flex items-center justify-center glow-cyan-active">
+                      <span className="w-1.5 h-1.5 bg-cyber-cyan rounded-full"></span>
+                    </div>
+                    <div className="border border-cyber-cyan/50 bg-cyber-cyan/5 p-2 rounded">
+                      <span className="text-[9px] font-mono text-cyber-cyan font-bold">CURRENT PROCESS STEP 5</span>
+                      <h4 className="text-xs font-mono font-bold text-white flex items-center gap-1">
+                        Landing Recommendation
+                      </h4>
+                      <p className="text-[10px] text-slate-400">Verifying safe locations and orbital telemetry</p>
+                    </div>
+                  </div>
+
+                  {/* Timeline Node 6 - Pending */}
+                  <div className="relative opacity-40">
+                    <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-slate-800 border border-panel-border"></div>
+                    <div>
+                      <span className="text-[9px] font-mono text-slate-500">STEP 6</span>
+                      <h4 className="text-xs font-mono font-bold text-slate-400">Trajectory Planning</h4>
+                      <p className="text-[10px] text-slate-500">Orbital calculations and fuel requirements</p>
+                    </div>
+                  </div>
+
+                  {/* Timeline Node 7 - Pending */}
+                  <div className="relative opacity-40">
+                    <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-slate-800 border border-panel-border"></div>
+                    <div>
+                      <span className="text-[9px] font-mono text-slate-500">STEP 7</span>
+                      <h4 className="text-xs font-mono font-bold text-slate-400">Mission Execution</h4>
+                      <p className="text-[10px] text-slate-500">Onboard guidance delegation sequences</p>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Subsystem Health Grid */}
+                <div className="bg-slate-900 border border-panel-border p-3.5 rounded space-y-2" id="subsystem-health-grid">
+                  <h4 className="text-[10px] font-mono font-bold uppercase text-slate-400 tracking-wider mb-1">
+                    SYSTEM HEALTH INDEX
+                  </h4>
+                  <div className="space-y-1.5 text-xs font-mono" id="subsystem-list">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">CORE POWER GRID:</span>
+                      <span className="text-cyber-green font-bold flex items-center gap-1">
+                        <span className="w-2 h-2 bg-cyber-green rounded-full glow-dot-green"></span> STABLE
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">S-BAND SATCOM:</span>
+                      <span className="text-cyber-green font-bold flex items-center gap-1">
+                        <span className="w-2 h-2 bg-cyber-green rounded-full glow-dot-green"></span> ONLINE
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">AI DETECTOR ENGINE:</span>
+                      <span className="text-cyber-green font-bold flex items-center gap-1">
+                        <span className="w-2 h-2 bg-cyber-green rounded-full glow-dot-green"></span> OPTIMAL
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </aside>
+              </aside>
+            )}
+
 
             {/* COLUMN 2: SITE RECOMMENDATION GEOGRAPHIC MAP */}
             <section className="flex-1 flex flex-col min-w-0 bg-slate-950 relative" id="center-map-column">

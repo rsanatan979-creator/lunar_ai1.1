@@ -100,7 +100,8 @@ class MissionEngine:
         # ── 1. Read DEM ──────────────────────────────────────────────
         log.info("Step 1: Reading DEM from %s", self.dem_path)
         elevation, profile = read_dem(self.dem_path)
-        pixel_size = float(profile["transform"][0])   # metres/pixel
+        pixel_size = profile.get("res", (30.0, 30.0))   # (x_res, y_res)
+
 
         elev_stats = {
             "min": round(float(np.nanmin(elevation)), 2),
@@ -169,7 +170,8 @@ class MissionEngine:
         log.info("Step 10: Planning rover path")
         start_px = default_start(fused_hazard)
         goal_px  = select_goal(sites, fused_hazard)
-        rover_path = plan_path(fused_hazard, start_px, goal_px)
+        rover_path = plan_path(fused_hazard, start_px, goal_px, pixel_size_m=pixel_size)
+
 
         # ── 11. Assemble output ───────────────────────────────────────
         log.info("Step 11: Assembling results")

@@ -20,5 +20,27 @@ def read_dem(path: str):
     """
     with rasterio.open(path) as src:
         elevation = src.read(1).astype(np.float32)   # band 1 = elevation
-        profile = src.profile
+        profile = dict(src.profile)
+        
+        # Extract pixel resolution from metadata
+        try:
+            x_res, y_res = src.res
+        except Exception:
+            x_res, y_res = None, None
+
+        if x_res is None or y_res is None:
+            transform = src.transform
+            if transform is not None:
+                x_res = abs(transform.a)
+                y_res = abs(transform.e)
+        
+        if not x_res or not y_res:
+            import warnings
+            warnings.warn("Pixel resolution metadata missing from DEM. Falling back to default 30.0m.")
+            x_res = x_res or 30.0
+            y_res = y_res or 30.0
+            
+        profile["res"] = (float(x_res), float(y_res))
+        
     return elevation, profile
+

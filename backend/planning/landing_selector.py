@@ -16,13 +16,37 @@ from scipy.ndimage import uniform_filter
 from typing import List, Dict, Any, Optional, Tuple
 
 
-# Default parameters (tunable per mission)
+# ── Tuning Parameters (Tuning per mission) ───────────────────────────────────
 WINDOW_SIZE = 15    # pixels — approximates the lander footprint
 TOP_N_SITES = 5     # number of candidate sites to return
 EDGE_MARGIN = 10    # pixels to exclude at the DEM border
 
 # Rover speed assumption for time estimate
 ROVER_SPEED_M_PER_MIN = 10.0   # metres per minute
+
+# ── Safety Score Weighting Formula & Documentation ───────────────────────────
+# The safety score is a 0-100 integer representing landing suitability.
+# Formula:
+#   safety_score = clip_0_100( (1.0 - average_fused_hazard) * 100 )
+#
+# Inputs & Weighting:
+#   1. Slope Angle: Accounts for 70% of the base DEM hazard score. Safe threshold < 5°, caution 5-15°, critical > 15°.
+#   2. Terrain Roughness: Accounts for 30% of the base DEM hazard score. Calculated via local elevation standard deviation.
+#   3. Obstacles (Crater/Rock): YOLOv11 detections boost local hazard scores. Craters add up to +0.55 hazard, rocks add up to +0.35.
+#   4. Flatness Window Size: All hazard factors are smoothed over a 15x15 pixel footprint to match the physical lander scale.
+
+def calculate_safety_score(windowed_hazard_score: float) -> int:
+    """
+    Inverts the fused hazard score (0 safe, 1 hazardous) into a 0-100 safety score.
+    
+    Args:
+        windowed_hazard_score: The average hazard index [0, 1] over the lander footprint.
+        
+    Returns:
+        safety_score: suitablity score from 0 (unsafe) to 100 (safest).
+    """
+    score = (1.0 - windowed_hazard_score) * 100
+    return max(0, min(100, int(round(score))))
 
 
 def find_candidate_sites(
@@ -48,9 +72,8 @@ def find_candidate_sites(
 
     Returns:
         List of dicts ordered by rank (1 = best), each containing:
-            rank, row, col, coordinates (str), safety_score (0-100 int),
-            hazard_score (float), slope (float), roughness (float),
-            hazard_level (str)
+            rank, name, row, col, coordinates, safety_score, hazard_score,
+            slope, roughness, hazard_level, safety_score_explanation
     """
     windowed = uniform_filter(hazard, size=window_size)
 
@@ -70,8 +93,8 @@ def find_candidate_sites(
         row, col = int(min_idx[0]), int(min_idx[1])
         h_score = float(windowed[row, col])
 
-        # Safety score: invert and scale to 0-100
-        safety_score = max(0, min(100, int(round((1.0 - h_score) * 100))))
+        # Safety score via formalized formula
+        safety_score = calculate_safety_score(h_score)
 
         # Per-site terrain metrics
         site_slope = float(np.nanmean(slope_deg[
@@ -94,6 +117,12 @@ def find_candidate_sites(
         # Geographic coordinates
         coordinates = _pixel_to_coords(row, col, transform)
 
+        # Plain language safety explanation for API consumer (frontend / README)
+        explanation = (
+            f"Safety score of {safety_score}% represents (1.0 - average hazard score of {h_score:.2f}) * 100. "
+            f"Determined by local slope ({site_slope:.1f}°), roughness ({site_roughness:.4f}), and YOLO crater/rock detections."
+        )
+
         # Human-readable site name
         site_names = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"]
         name = f"SITE {site_names[rank - 1]}" if rank <= len(site_names) else f"SITE-{rank}"
@@ -109,7 +138,9 @@ def find_candidate_sites(
             "slope": round(site_slope, 2),
             "roughness": round(site_roughness, 4),
             "hazard_level": hazard_level,
+            "safety_score_explanation": explanation,
         })
+
 
         # Suppress the neighbourhood so next pick is spatially distinct
         r0 = max(0, row - window_size)

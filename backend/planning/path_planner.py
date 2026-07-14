@@ -23,7 +23,7 @@ def plan_path(
     hazard: np.ndarray,
     start: Tuple[int, int],
     goal: Tuple[int, int],
-    pixel_size_m: float = PIXEL_SIZE_M,
+    pixel_size_m = PIXEL_SIZE_M,
 ) -> Dict[str, Any]:
     """
     Find a minimum-hazard A* path from start to goal on the hazard grid.
@@ -32,7 +32,7 @@ def plan_path(
         hazard:       2-D float32 hazard array [0, 1].
         start:        (row, col) start pixel.
         goal:         (row, col) goal pixel.
-        pixel_size_m: Metres per pixel used for distance estimates.
+        pixel_size_m: Metres per pixel used for distance estimates. Can be float or tuple/list (x_res, y_res).
 
     Returns:
         dict with:
@@ -107,8 +107,19 @@ def plan_path(
         cur = came_from.get(cur)
     path.reverse()
 
+    # Calculate physical distance step-by-step
+    if isinstance(pixel_size_m, (tuple, list)):
+        x_res, y_res = pixel_size_m
+    else:
+        x_res = y_res = pixel_size_m
+
+    dist_m = 0.0
+    for i in range(len(path) - 1):
+        r0, c0 = path[i]
+        r1, c1 = path[i+1]
+        dist_m += math.sqrt(((r1 - r0) * y_res) ** 2 + ((c1 - c0) * x_res) ** 2)
+
     total_pixels = len(path)
-    dist_m = total_pixels * pixel_size_m
     time_min = dist_m / ROVER_SPEED_M_PER_MIN
 
     # Simplified waypoints for frontend display (every 5th point)
@@ -123,6 +134,7 @@ def plan_path(
         "estimated_time_min": round(time_min, 1),
         "hazard_avoided": _count_avoided(path, hazard),
     }
+
 
 
 def select_goal(sites: List[Dict[str, Any]], hazard: np.ndarray) -> Tuple[int, int]:
@@ -168,13 +180,24 @@ def _empty_path(start: Tuple[int, int]) -> Dict[str, Any]:
 
 
 def _straight_line_path(
-    start: Tuple[int, int], goal: Tuple[int, int], pixel_size_m: float
+    start: Tuple[int, int], goal: Tuple[int, int], pixel_size_m
 ) -> Dict[str, Any]:
     """Bresenham straight-line fallback path."""
     r0, c0 = start
     r1, c1 = goal
     points = _bresenham(r0, c0, r1, c1)
-    dist_m = len(points) * pixel_size_m
+
+    if isinstance(pixel_size_m, (tuple, list)):
+        x_res, y_res = pixel_size_m
+    else:
+        x_res = y_res = pixel_size_m
+
+    dist_m = 0.0
+    for i in range(len(points) - 1):
+        pr0, pc0 = points[i]
+        pr1, pc1 = points[i+1]
+        dist_m += math.sqrt(((pr1 - pr0) * y_res) ** 2 + ((pc1 - pc0) * x_res) ** 2)
+
     return {
         "waypoints": [[r, c] for r, c in points[::5]],
         "total_pixels": len(points),
@@ -182,6 +205,7 @@ def _straight_line_path(
         "estimated_time_min": round(dist_m / ROVER_SPEED_M_PER_MIN, 1),
         "hazard_avoided": 0,
     }
+
 
 
 def _bresenham(r0: int, c0: int, r1: int, c1: int) -> List[Tuple[int, int]]:

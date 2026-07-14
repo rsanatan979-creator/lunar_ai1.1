@@ -44,8 +44,10 @@ d:\sipun\
 ├── weights/
 │   ├── best.pt                YOLOv11 trained weights
 │   └── last.pt
-└── Lunar_DEM/                 Original DEM pipeline scripts (reference)
+└── legacy_archive/
+    └── Lunar_DEM/             Deprecated legacy/reference DEM scripts (kept for reference/comparison only)
 ```
+
 
 ---
 
