@@ -1049,10 +1049,10 @@ export default function App() {
 
                 <div className="space-y-2" id="mission-intelligence-metrics">
                   {[
-                    { label: 'MISSION SCORE', val: '94.5 / 100', id: 'mission-score', color: 'text-cyber-green' },
-                    { label: 'SAFE AREA %', val: '78.2%', id: 'landing-score', color: 'text-cyber-cyan' },
-                    { label: 'MEAN ELEVATION', val: '-120m', id: 'mean-elevation', color: 'text-slate-200' },
-                    { label: 'MAX SLOPE', val: `${activeSite.slope + 8}°`, id: 'max-slope', color: 'text-cyber-red' },
+                    { label: 'MISSION SCORE', val: apiData ? `${apiData.summary.mission_score} / 100` : '94.5 / 100', id: 'mission-score', color: 'text-cyber-green' },
+                    { label: 'SAFE AREA %', val: apiData ? `${apiData.terrain_stats.safe_pct}%` : '78.2%', id: 'landing-score', color: 'text-cyber-cyan' },
+                    { label: 'MEAN ELEVATION', val: apiData ? `${apiData.elevation.mean}m` : '-120m', id: 'mean-elevation', color: 'text-slate-200' },
+                    { label: 'MAX SLOPE', val: apiData ? `${apiData.elevation.max}°` : `${activeSite.slope + 8}°`, id: 'max-slope', color: 'text-cyber-red' },
                     { label: 'TEMP PROFILES', val: '-40°C', id: 'temp-profile', color: 'text-cyber-blue' }
                   ].map((item) => (
                     <div key={item.label} className="bg-slate-900 border border-panel-border/60 rounded px-3 py-2 flex items-center justify-between hover:border-panel-border transition-all">
@@ -1445,11 +1445,11 @@ export default function App() {
                 </div>
                 
                 <h4 className="text-xs font-bold text-white tracking-wide">
-                  OPTIMAL SITE SELECTED: <span className="text-cyber-green font-mono font-black" id="landing-score">SITE ALPHA</span>
+                  OPTIMAL SITE SELECTED: <span className="text-cyber-green font-mono font-black" id="landing-score">{apiData?.summary?.recommended_site || "SITE ALPHA"}</span>
                 </h4>
                 
                 <p className="text-[10px] text-slate-400 leading-relaxed font-mono">
-                  Based on complete multi-spectral DEM terrain clearance, Site Alpha is highly recommended due to exceptional safety index rating, minimal basalt rock distribution, and continuous direct-line-of-sight satellite communications back to Earth telemetry stations.
+                  {apiData ? (apiData.landing_sites[0]?.coordinates ? `Site ${apiData.landing_sites[0].name} has been selected as the optimal landing candidate. Coordinates: ${apiData.landing_sites[0].coordinates}. Safety score: ${apiData.landing_sites[0].safety_score}/100. Average slope: ${apiData.landing_sites[0].slope}°.` : activeSite.description) : activeSite.description}
                 </p>
 
                 <div className="text-[9px] font-mono text-slate-500 border-t border-panel-border/40 pt-2 flex items-center justify-between">
